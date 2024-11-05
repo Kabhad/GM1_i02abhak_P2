@@ -1,0 +1,12 @@
+module:GM1_i02abhak
+es.uco.pw.classes.jugador
+es.uco.pw.classes.material
+es.uco.pw.classes.pista
+es.uco.pw.classes.reserva
+es.uco.pw.displays.jugadores
+es.uco.pw.displays.pistas
+es.uco.pw.displays.principal
+es.uco.pw.displays.reservas
+es.uco.pw.gestores.jugadores
+es.uco.pw.gestores.pistas
+es.uco.pw.gestores.reservas
