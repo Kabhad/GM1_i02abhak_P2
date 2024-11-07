@@ -33,7 +33,11 @@ public class ReservaIndividual extends ReservaDTO {
         return reservaEspecifica;
     }
 
-    /**
+    public void setReservaEspecifica(ReservaDTO reservaEspecifica) {
+		this.reservaEspecifica = reservaEspecifica;
+	}
+
+	/**
      * Aplica un descuento tanto a la reserva individual como a la reserva específica.
      *
      * @param descuento El porcentaje de descuento a aplicar.

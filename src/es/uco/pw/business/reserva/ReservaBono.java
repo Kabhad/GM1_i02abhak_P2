@@ -42,6 +42,11 @@ public class ReservaBono extends ReservaDTO {
     public ReservaDTO getReservaEspecifica() {
         return reservaEspecifica;
     }
+    
+    public void setReservaEspecifica(ReservaDTO reservaEspecifica) {
+		this.reservaEspecifica = reservaEspecifica;
+	}
+
 
     /**
      * Retorna una representación en cadena de la reserva de bono.
@@ -161,8 +166,8 @@ public class ReservaBono extends ReservaDTO {
     public int getNumeroSesion() {
         return numeroSesion;
     }
-
-    /**
+    
+	/**
      * Establece el número de sesión del bono.
      * 
      * @param numeroSesion El nuevo número de sesión.
