@@ -4,13 +4,10 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.util.Scanner;
 
-import es.uco.pw.data.dao.JugadoresDAO;
-import es.uco.pw.data.dao.PistasDAO;
-import es.uco.pw.data.dao.ReservasDAO;
 import es.uco.pw.displays.jugadores.mainJugadores;
 import es.uco.pw.displays.pistas.mainPistas;
 import es.uco.pw.displays.reservas.mainReservas;
-
+import es.uco.pw.data.dao.ReservasDAO;
 /**
  * Clase principal que gestiona la ejecución del sistema de gestión.
  */
@@ -40,20 +37,8 @@ public class mainPrincipal {
      */
     public static void main(String[] args) throws IOException, ParseException {
         Scanner sc = new Scanner(System.in);
-        JugadoresDAO jugadoresDAO = JugadoresDAO.getInstance(); // Obtener la instancia del gestor de jugadores
-        ReservasDAO reservasDAO = ReservasDAO.getInstance();
-        PistasDAO pistasDAO = PistasDAO.getInstance();
-  
-        System.out.println("Cargando datos de ficheros en memoria...");
-        // Cargar primero los jugadores
-        jugadoresDAO.cargarJugadoresDesdeFichero();
-        // Luego, cargar las reservas
-        reservasDAO.cargarReservasDesdeFichero();
-        // Cargar materiales
-        pistasDAO.cargarMaterialesDesdeFichero();
-        // Antes de cargar pistas
-        pistasDAO.cargarPistasDesdeFichero();
-        System.out.println("Datos cargados.");
+        ReservasDAO reservasDAO = new ReservasDAO();
+        
         int opcion;
         boolean continuar = true;
 
@@ -69,7 +54,7 @@ public class mainPrincipal {
                     break;
                 case 2:
                     System.out.println("Accediendo al Menú de Reservas...");
-                    mainReservas.main(sc);
+                    mainReservas.main(sc, reservasDAO);
                     break;
                 case 3:
                     System.out.println("Accediendo al Menú de Usuarios...");
@@ -78,10 +63,6 @@ public class mainPrincipal {
                 case 0:
                     System.out.println("Saliendo del programa. Guardando datos en los ficheros...");
                     continuar = false; // Romper el bucle para salir
-                    reservasDAO.guardarReservasEnFichero();
-                    jugadoresDAO.guardarJugadoresEnFichero();
-                    pistasDAO.guardarPistasEnFichero();
-                    pistasDAO.guardarMaterialesEnFichero();
                     break;
                 default:
                     System.out.println("Opción no válida. Por favor, intente nuevamente.");

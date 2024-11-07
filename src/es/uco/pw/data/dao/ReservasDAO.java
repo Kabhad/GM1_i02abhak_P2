@@ -4,195 +4,47 @@ import es.uco.pw.business.jugador.JugadorDTO;
 import es.uco.pw.business.pista.PistaDTO;
 import es.uco.pw.business.pista.TamanoPista;
 import es.uco.pw.business.reserva.*;
+import es.uco.pw.data.common.DBConnection;
 
 import java.util.*;
 import java.io.*;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.stream.Collectors;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.ResultSet;
+import com.mysql.jdbc.Statement;
 
 /**
  * Clase que gestiona las reservas de pistas de baloncesto, incluyendo la carga y
  * almacenamiento de reservas en ficheros, así como la gestión de jugadores y pistas.
  */
 public class ReservasDAO {
-    private List<ReservaDTO> reservaDTOs;
-    private Map<String, JugadorDTO> jugadores;
-    private Map<Integer, PistaDTO> pistaDTOs;
-    private static ReservasDAO instancia;
-    private String ficheroReservasPath;
+    private Connection con;
+    private Properties prop;
 
     /**
      * Constructor privado para evitar instanciación directa.
-     * Inicializa las listas y carga la ruta del fichero de reservas.
+     * Inicializa la conexion a la BD e instancia reservas.
      */
-    private ReservasDAO() {
-        this.reservaDTOs = new ArrayList<>();
-        this.jugadores = new HashMap<>();
-        this.pistaDTOs = new HashMap<>();
-        this.cargarRutaFicheros();  // Cargar la ruta del fichero desde properties.txt
-    }
-
-    /**
-     * Método estático para obtener la única instancia del gestor.
-     * 
-     * @return La instancia única de GestorReservas.
-     */
-    public static synchronized ReservasDAO getInstance() {
-        if (instancia == null) {
-            instancia = new ReservasDAO();
+    public ReservasDAO() {
+    	
+        prop = new Properties();
+        
+        try {
+        	BufferedReader reader = new BufferedReader(new FileReader("sql.properties"));
+        	prop.load(reader);
+        	reader.close();
+        } catch(FileNotFoundException e) {
+        	e.printStackTrace();
+        } catch(IOException e) {
+        	e.printStackTrace();
         }
-        return instancia;
-    }
-
-    /**
-     * Método para cargar la ruta del fichero desde properties.txt.
-     */
-    private void cargarRutaFicheros() {
-        Properties properties = new Properties();
-        try (FileInputStream fis = new FileInputStream("src/Ficheros/properties.txt")) {
-            properties.load(fis);
-            this.ficheroReservasPath = properties.getProperty("reservasFile");
-        } catch (IOException e) {
-            throw new RuntimeException("Error al leer el fichero de propiedades: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Carga las reservas desde un fichero CSV y las almacena en la lista de reservas.
-     * 
-     * @throws IOException Si ocurre un error al leer el fichero.
-     * @throws ParseException Si ocurre un error al parsear las fechas.
-     */
-    public void cargarReservasDesdeFichero() throws IOException, ParseException {
-        try (BufferedReader br = new BufferedReader(new FileReader(ficheroReservasPath))) {
-            String linea;
-            while ((linea = br.readLine()) != null) {
-                String[] datos = linea.split(";");
-
-                String tipoReserva = datos[0];
-                String tipoUsuario = datos[1];
-                int idUsuario = Integer.parseInt(datos[2]);
-                Date fechaHora = new SimpleDateFormat("yyyy-MM-dd HH:mm").parse(datos[3]);
-                int duracionMinutos = Integer.parseInt(datos[4]);
-                int idPista = Integer.parseInt(datos[5]);
-                int numeroAdultos = Integer.parseInt(datos[6]);
-                int numeroNinos = Integer.parseInt(datos[7]);
-
-                ReservaDTO reservaDTO = null;
-
-                if (tipoReserva.equalsIgnoreCase("individual")) {
-                    reservaDTO = ReservaGeneralFactory.crearReserva(
-                        tipoUsuario, 
-                        idUsuario, 
-                        fechaHora, 
-                        duracionMinutos, 
-                        idPista, 
-                        numeroAdultos, 
-                        numeroNinos, 
-                        false, 
-                        null, 
-                        0
-                    );
-                } else if (tipoReserva.equalsIgnoreCase("bono")) {
-                    int idBono = Integer.parseInt(datos[8]);
-                    int numeroSesion = Integer.parseInt(datos[9]);
-
-                    Bono bono = new Bono(idBono, idUsuario, numeroSesion, fechaHora);
-                    reservaDTO = ReservaGeneralFactory.crearReserva(
-                        tipoUsuario, 
-                        idUsuario, 
-                        fechaHora, 
-                        duracionMinutos, 
-                        idPista, 
-                        numeroAdultos, 
-                        numeroNinos, 
-                        false, 
-                        bono, 
-                        numeroSesion
-                    );
-                }
-
-                if (reservaDTO != null) {
-                    reservaDTOs.add(reservaDTO);
-                }
-            }
-        } 
-    }
-
-    /**
-     * Guarda las reservas en un fichero CSV.
-     * 
-     * @throws IOException Si ocurre un error al escribir el fichero.
-     */
-    public void guardarReservasEnFichero() throws IOException {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(ficheroReservasPath))) {
-            for (ReservaDTO reservaDTO : reservaDTOs) {
-                StringBuilder sb = new StringBuilder();
-
-                if (reservaDTO instanceof ReservaBono) {
-                    ReservaBono reservaBono = (ReservaBono) reservaDTO;
-                    ReservaDTO reservaEspecifica = reservaBono.getReservaEspecifica();
-                    String tipoUsuario = "";
-                    int numeroAdultos = 0;
-                    int numeroNinos = 0;
-
-                    if (reservaEspecifica instanceof ReservaInfantil) {
-                        tipoUsuario = "infantil";
-                        numeroNinos = ((ReservaInfantil) reservaEspecifica).getNumeroNinos();
-                    } else if (reservaEspecifica instanceof ReservaAdulto) {
-                        tipoUsuario = "adulto";
-                        numeroAdultos = ((ReservaAdulto) reservaEspecifica).getNumeroAdultos();
-                    } else if (reservaEspecifica instanceof ReservaFamiliar) {
-                        tipoUsuario = "familiar";
-                        numeroAdultos = ((ReservaFamiliar) reservaEspecifica).getNumeroAdultos();
-                        numeroNinos = ((ReservaFamiliar) reservaEspecifica).getNumeroNinos();
-                    }
-
-                    sb.append("bono;").append(tipoUsuario).append(";")
-                        .append(reservaBono.getIdUsuario()).append(";")
-                        .append(new SimpleDateFormat("yyyy-MM-dd HH:mm").format(reservaBono.getFechaHora())).append(";")
-                        .append(reservaBono.getDuracionMinutos()).append(";")
-                        .append(reservaBono.getIdPista()).append(";")
-                        .append(numeroAdultos).append(";").append(numeroNinos).append(";")
-                        .append(reservaBono.getBono().getIdBono()).append(";")
-                        .append(reservaBono.getNumeroSesion()).append(";");
-
-                } else if (reservaDTO instanceof ReservaIndividual) {
-                    ReservaIndividual reservaIndividual = (ReservaIndividual) reservaDTO;
-                    ReservaDTO reservaEspecifica = reservaIndividual.getReservaEspecifica();
-                    String tipoUsuario = "";
-                    int numeroAdultos = 0;
-                    int numeroNinos = 0;
-
-                    if (reservaEspecifica instanceof ReservaInfantil) {
-                        tipoUsuario = "infantil";
-                        numeroNinos = ((ReservaInfantil) reservaEspecifica).getNumeroNinos();
-                    } else if (reservaEspecifica instanceof ReservaAdulto) {
-                        tipoUsuario = "adulto";
-                        numeroAdultos = ((ReservaAdulto) reservaEspecifica).getNumeroAdultos();
-                    } else if (reservaEspecifica instanceof ReservaFamiliar) {
-                        tipoUsuario = "familiar";
-                        numeroAdultos = ((ReservaFamiliar) reservaEspecifica).getNumeroAdultos();
-                        numeroNinos = ((ReservaFamiliar) reservaEspecifica).getNumeroNinos();
-                    }
-
-                    sb.append("individual;").append(tipoUsuario).append(";")
-                        .append(reservaIndividual.getIdUsuario()).append(";")
-                        .append(new SimpleDateFormat("yyyy-MM-dd HH:mm").format(reservaIndividual.getFechaHora())).append(";")
-                        .append(reservaIndividual.getDuracionMinutos()).append(";")
-                        .append(reservaIndividual.getIdPista()).append(";")
-                        .append(numeroAdultos).append(";").append(numeroNinos).append(";");
-                }
-
-                bw.write(sb.toString());
-                bw.newLine();
-            }
-        } 
     }
 
     /**
@@ -204,24 +56,81 @@ public class ReservasDAO {
     public static JugadorDTO buscarJugadorPorId(int idJugador) {
         return JugadoresDAO.getInstance().buscarJugadorPorId(idJugador);
     }
-
-    /**
-     * Registra un nuevo jugador en el gestor de reservas.
-     * 
-     * @param jugadorDTO El jugador a registrar.
-     */
-    public void registrarJugador(JugadorDTO jugadorDTO) {
-        jugadores.put(jugadorDTO.getCorreoElectronico(), jugadorDTO);
+    
+    private void insertarReservaFamiliar(int idReserva, int numeroAdultos, int numeroNinos) throws SQLException {
+        String sql = prop.getProperty("insertarReservaFamiliar");
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idReserva);
+            ps.setInt(2, numeroAdultos);
+            ps.setInt(3, numeroNinos);
+            ps.executeUpdate();
+        }
     }
 
-    /**
-     * Registra una nueva pista en el gestor de reservas.
-     * 
-     * @param pistaDTO La pista a registrar.
-     */
-    public void registrarPista(PistaDTO pistaDTO) {
-        pistaDTOs.put(pistaDTO.getIdPista(), pistaDTO);
+    private void insertarReservaAdulto(int idReserva, int numeroAdultos) throws SQLException {
+        String sql = prop.getProperty("insertarReservaAdulto");
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idReserva);
+            ps.setInt(2, numeroAdultos);
+            ps.executeUpdate();
+        }
     }
+
+    private void insertarReservaInfantil(int idReserva, int numeroNinos) throws SQLException {
+        String sql = prop.getProperty("insertarReservaInfantil");
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idReserva);
+            ps.setInt(2, numeroNinos);
+            ps.executeUpdate();
+        }
+    }
+
+    
+    public int insertarReserva(ReservaDTO reservaDTO) {
+        int idReserva = -1;
+        String sql = prop.getProperty("insertarReserva");
+        DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+
+        try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            // Inserción en la tabla `Reserva`
+            ps.setInt(1, reservaDTO.getIdUsuario());
+            ps.setInt(2, reservaDTO.getIdPista());
+            ps.setTimestamp(3, new java.sql.Timestamp(reservaDTO.getFechaHora().getTime()));
+            ps.setInt(4, reservaDTO.getDuracionMinutos());
+            ps.setFloat(5, reservaDTO.getPrecio());
+            ps.setFloat(6, reservaDTO.getDescuento());
+            ps.setObject(7, reservaDTO instanceof ReservaBono ? ((ReservaBono) reservaDTO).getBono().getIdBono() : null);
+
+            ps.executeUpdate();
+
+            // Obtener el `idReserva` generado
+            try (ResultSet rs = (ResultSet) ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    idReserva = rs.getInt(1);
+                }
+            }
+
+            // Si se generó el `idReserva`, se inserta en la tabla específica según el tipo de reserva
+            if (idReserva != -1) {
+                if (reservaDTO instanceof ReservaFamiliar) {
+                    insertarReservaFamiliar(idReserva, ((ReservaFamiliar) reservaDTO).getNumeroAdultos(), ((ReservaFamiliar) reservaDTO).getNumeroNinos());
+                } else if (reservaDTO instanceof ReservaAdulto) {
+                    insertarReservaAdulto(idReserva, ((ReservaAdulto) reservaDTO).getNumeroAdultos());
+                } else if (reservaDTO instanceof ReservaInfantil) {
+                    insertarReservaInfantil(idReserva, ((ReservaInfantil) reservaDTO).getNumeroNinos());
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return idReserva;
+    }
+
+
 
     /**
      * Realiza una reserva individual para un jugador.
@@ -234,12 +143,12 @@ public class ReservasDAO {
      * @param numeroNinos El número de niños en la reserva.
      * @throws IllegalArgumentException Si la cuenta del jugador no es válida.
      */
-    public void hacerReservaIndividual(JugadorDTO jugadorDTO, Date fechaHora, int duracionMinutos, PistaDTO pistaDTO, int numeroAdultos, int numeroNinos) {
-    	if (!jugadorDTO.isCuentaActiva()) {
+    public int hacerReservaIndividual(JugadorDTO jugadorDTO, Date fechaHora, int duracionMinutos, PistaDTO pistaDTO, int numeroAdultos, int numeroNinos) {
+        if (!jugadorDTO.isCuentaActiva()) {
             throw new IllegalArgumentException("La cuenta del jugador no está activa.");
         }
-    	
-    	String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
+
+        String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
         if (!cumpleCondicionesTipoReserva(pistaDTO, tipoReserva)) {
             throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
         }
@@ -247,20 +156,26 @@ public class ReservasDAO {
         boolean tieneAntiguedad = jugadorDTO.calcularAntiguedad() > 2;
 
         ReservaDTO reservaDTO = ReservaGeneralFactory.crearReserva(
-                tipoReserva,  
-                jugadorDTO.getIdJugador(),  
-                fechaHora,  
-                duracionMinutos,  
-                pistaDTO.getIdPista(),  
-                numeroAdultos,  
-                numeroNinos,  
-                tieneAntiguedad,  
-                null,  
-                0 
+                tipoReserva,
+                jugadorDTO.getIdJugador(),
+                fechaHora,
+                duracionMinutos,
+                pistaDTO.getIdPista(),
+                numeroAdultos,
+                numeroNinos,
+                tieneAntiguedad,
+                null,
+                0
         );
 
-        this.reservaDTOs.add(reservaDTO);
+        // Inserta la reserva en la base de datos
+        // Crea una instancia de ReservasDAO para llamar a insertarReserva
+        ReservasDAO reservasDAO = new ReservasDAO();
+        int idReserva = reservasDAO.insertarReserva(reservaDTO); // Llama al método no estático
+        reservaDTO.setIdReserva(idReserva); // Asigna el idReserva después de la inserción
+        return 1;
     }
+
 
     /**
      * Realiza una reserva utilizando un bono para un jugador.

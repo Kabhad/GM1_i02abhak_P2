@@ -45,8 +45,7 @@ public class mainReservas {
      * 
      * @param sc Scanner para la entrada del usuario.
      */
-    public static void main(Scanner sc) {
-        ReservasDAO reservasDAO = ReservasDAO.getInstance();  // Obtener la instancia del gestor (Singleton)
+    public static void main(Scanner sc, ReservasDAO reservasDAO) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         int opcion;
         boolean continuar = true;
@@ -57,64 +56,63 @@ public class mainReservas {
             sc.nextLine();  // Limpiar el buffer
 
             switch (opcion) {
-                case 1:
-                    // Hacer una reserva individual
-                    System.out.println("Iniciando proceso para hacer una reserva individual...");
-                    try {
-                        System.out.print("Ingrese el correo del usuario: ");
-                        String correo = sc.nextLine();
-                        JugadorDTO jugadorDTO = reservasDAO.buscarJugadorPorCorreo(correo);
-                        if (jugadorDTO == null) {
-                            System.out.println("Jugador no encontrado.");
-                            break;
-                        }
-
-                        List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles();
-                        if (pistasDisponibles.isEmpty()) {
-                            System.out.println("No hay pistas disponibles.");
-                            break;
-                        }
-
-                        System.out.println("Pistas disponibles para reservar:");
-                        for (PistaDTO pistaDTO : pistasDisponibles) {
-                            System.out.println("ID: " + pistaDTO.getIdPista() + ", Nombre: " + pistaDTO.getNombrePista() + ", Máx. Jugadores: " + pistaDTO.getMax_jugadores());
-                        }
-
-                        System.out.print("Ingrese ID de la pista: ");
-                        int idPista = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-                        PistaDTO pistaDTO = pistasDisponibles.stream().filter(p -> p.getIdPista() == idPista).findFirst().orElse(null);
-                        if (pistaDTO == null) {
-                            System.out.println("Pista no válida.");
-                            break;
-                        }
-
-                        System.out.print("Ingrese fecha y hora (yyyy-MM-dd HH:mm): ");
-                        Date fechaHora = dateFormat.parse(sc.nextLine());
-
-                        System.out.print("Ingrese duración en minutos (60, 90, 120): ");
-                        int duracionMinutos = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-
-                        System.out.print("Ingrese número de adultos: ");
-                        int numeroAdultos = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-
-                        System.out.print("Ingrese número de niños: ");
-                        int numeroNinos = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-
-                        try {
-                            reservasDAO.hacerReservaIndividual(jugadorDTO, fechaHora, duracionMinutos, pistaDTO, numeroAdultos, numeroNinos);
-                            System.out.println("Reserva individual creada correctamente.");
-                        } catch (IllegalArgumentException e) {
-                            System.out.println("Error al crear la reserva: " + e.getMessage());
-                        }
-                    } catch (ParseException e) {
-                        System.out.println("Formato de fecha incorrecto.");
+            case 1:
+                System.out.println("Iniciando proceso para hacer una reserva individual...");
+                try {
+                    System.out.print("Ingrese el correo del usuario: ");
+                    String correo = sc.nextLine();
+                    JugadorDTO jugadorDTO = reservasDAO.buscarJugadorPorCorreo(correo);
+                    if (jugadorDTO == null) {
+                        System.out.println("Jugador no encontrado.");
+                        break;
                     }
-                    break;
 
+                    List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles();
+                    if (pistasDisponibles.isEmpty()) {
+                        System.out.println("No hay pistas disponibles.");
+                        break;
+                    }
+
+                    System.out.println("Pistas disponibles para reservar:");
+                    for (PistaDTO pistaDTO : pistasDisponibles) {
+                        System.out.println("ID: " + pistaDTO.getIdPista() + ", Nombre: " + pistaDTO.getNombrePista() + ", Máx. Jugadores: " + pistaDTO.getMax_jugadores());
+                    }
+
+                    System.out.print("Ingrese ID de la pista: ");
+                    int idPista = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+                    PistaDTO pistaDTO = pistasDisponibles.stream().filter(p -> p.getIdPista() == idPista).findFirst().orElse(null);
+                    if (pistaDTO == null) {
+                        System.out.println("Pista no válida.");
+                        break;
+                    }
+
+                    System.out.print("Ingrese fecha y hora (yyyy-MM-dd HH:mm): ");
+                    Date fechaHora = dateFormat.parse(sc.nextLine());
+
+                    System.out.print("Ingrese duración en minutos (60, 90, 120): ");
+                    int duracionMinutos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+
+                    System.out.print("Ingrese número de adultos: ");
+                    int numeroAdultos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+
+                    System.out.print("Ingrese número de niños: ");
+                    int numeroNinos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+
+                    try {
+                        int idReserva = reservasDAO.hacerReservaIndividual(jugadorDTO, fechaHora, duracionMinutos, pistaDTO, numeroAdultos, numeroNinos);
+                        System.out.println("Reserva individual creada correctamente con ID: " + idReserva);
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("Error al crear la reserva: " + e.getMessage());
+                    }
+                } catch (ParseException e) {
+                    System.out.println("Formato de fecha incorrecto.");
+                }
+                break;
+  
                 case 2:
                     // Hacer una reserva con bono
                     System.out.println("Iniciando proceso para hacer una reserva con bono...");

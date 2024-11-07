@@ -8,6 +8,7 @@ import java.util.Date;
  */
 public abstract class ReservaDTO {
     // Atributos comunes a todas las reservas
+	private int idReserva; // Nuevo campo
     private int idUsuario;
     private Date fechaHora;
     private int duracionMinutos;
@@ -158,6 +159,15 @@ public abstract class ReservaDTO {
     public float getDescuento() {
         return descuento;
     }
+    
+    public int getIdReserva() {
+        return idReserva;
+    }
+
+    public void setIdReserva(int idReserva) {
+        this.idReserva = idReserva;
+    }
+
 
     /**
      * Establece el porcentaje de descuento aplicado a la reserva y recalcula el precio.
