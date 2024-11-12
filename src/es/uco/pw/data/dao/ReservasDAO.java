@@ -428,18 +428,36 @@ public class ReservasDAO {
      * @param idPista El ID de la pista para consultar reservas.
      * @return Una lista de reservas para el día y la pista especificados.
      */
-    public List<ReservaDTO> consultarReservasPorDiaYPista(Date dia, int idPista) {
-        List<ReservaDTO> reservasPorDiaYPista = new ArrayList<>();
-        String sql = prop.getProperty("consultarReservasPorDiaYPista");
+
+    public List<ReservaDTO> consultarReservasPorRangoDeFechasYPista(Date fechaInicio, Date fechaFin, int idPista) {
+        List<ReservaDTO> reservasPorRangoYPista = new ArrayList<>();
+        String sql = prop.getProperty("consultarReservasPorRangoDeFechasYPista");
         DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
 
-        try (
-             PreparedStatement ps = con.prepareStatement(sql)) {
+        // Ajustar la fecha de inicio al inicio del día (00:00:00)
+        Calendar calInicio = Calendar.getInstance();
+        calInicio.setTime(fechaInicio);
+        calInicio.set(Calendar.HOUR_OF_DAY, 0);
+        calInicio.set(Calendar.MINUTE, 0);
+        calInicio.set(Calendar.SECOND, 0);
+        calInicio.set(Calendar.MILLISECOND, 0);
+        Date fechaInicioAjustada = calInicio.getTime();
 
-            // Definir las fechas de inicio y fin del día especificado para la consulta
-            ps.setDate(1, new java.sql.Date(dia.getTime()));
-            ps.setDate(2, new java.sql.Date(dia.getTime()));
+        // Ajustar la fecha de fin al final del día (23:59:59)
+        Calendar calFin = Calendar.getInstance();
+        calFin.setTime(fechaFin);
+        calFin.set(Calendar.HOUR_OF_DAY, 23);
+        calFin.set(Calendar.MINUTE, 59);
+        calFin.set(Calendar.SECOND, 59);
+        calFin.set(Calendar.MILLISECOND, 999);
+        Date fechaFinAjustada = calFin.getTime();
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+
+            // Usar fechas ajustadas en la consulta
+            ps.setTimestamp(1, new java.sql.Timestamp(fechaInicioAjustada.getTime()));
+            ps.setTimestamp(2, new java.sql.Timestamp(fechaFinAjustada.getTime()));
             ps.setInt(3, idPista);
 
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
@@ -450,23 +468,44 @@ public class ReservasDAO {
                     int duracionMin = rs.getInt("duracionMin");
                     float precio = rs.getFloat("precio");
                     float descuento = rs.getFloat("descuento");
-                    Integer idBono = rs.getObject("idBono", Integer.class);
+                    Integer idBono = rs.getObject("idBono") != null ? rs.getInt("idBono") : null; // Verifica si puede ser null
 
-                    ReservaDTO reserva = (idBono != null)
-                        ? new ReservaBono(idJugador, fechaHora, duracionMin, idPista, obtenerBono(idBono), rs.getInt("numeroSesion"), obtenerReservaEspecifica(idReserva))
-                        : new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
+                    ReservaDTO reservaDTO;
                     
-                    reserva.setPrecio(precio);
-                    reserva.setDescuento(descuento);
+                    // Verificar si hay un bono y calcular el numeroSesion
+                    if (idBono != null) {
+                        Bono bono = obtenerBono(idBono);
+                        ReservaDTO reservaEspecifica = obtenerReservaEspecifica(idReserva);
+                        
+                        // Calcular el numeroSesion basado en sesionesRestantes
+                        int numeroSesion = 5 - bono.getSesionesRestantes();  // Ajusta este cálculo según tu lógica
 
-                    reservasPorDiaYPista.add(reserva);
+                        if (reservaEspecifica == null) {
+                            System.out.println("Error: reserva específica no encontrada.");
+                            continue;  // Saltar esta iteración si no se encuentra la reserva específica
+                        }
+
+                        // Crear la reserva con bono
+                        reservaDTO = new ReservaBono(idJugador, fechaHora, duracionMin, idPista, bono, numeroSesion, reservaEspecifica);
+                    } else {
+                        // Crear la reserva individual
+                        reservaDTO = new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
+                    }
+
+                    // Establecer el precio y descuento
+                    reservaDTO.setIdReserva(idReserva);
+                    reservaDTO.setPrecio(precio);
+                    reservaDTO.setDescuento(descuento);
+
+                    // Agregar la reserva a la lista
+                    reservasPorRangoYPista.add(reservaDTO);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        return reservasPorDiaYPista;
+        return reservasPorRangoYPista;
     }
 
 
