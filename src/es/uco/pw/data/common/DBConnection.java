@@ -30,7 +30,7 @@ public class DBConnection {
 			
 			Class.forName("com.mysql.jdbc.Driver");
 			this.connection = (Connection) DriverManager.getConnection(url, user, password);
-			System.out.println("Database connection successfully opened!");
+			//System.out.println("Database connection successfully opened!");
 			
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
