@@ -689,8 +689,9 @@ public class ReservasDAO {
      * Lista las pistas disponibles.
      *
      * @return Una lista de pistas disponibles.
+     * @throws SQLException 
      */
-    public List<PistaDTO> listarPistasDisponibles() {
+    public List<PistaDTO> listarPistasDisponibles() throws SQLException {
         return PistasDAO.getInstance().buscarPistasDisponibles();
     }
 
@@ -699,8 +700,9 @@ public class ReservasDAO {
      *
      * @param idPista El ID de la pista a buscar.
      * @return La pista encontrada, o null si no se encuentra.
+     * @throws SQLException 
      */
-    public static PistaDTO buscarPistaPorId(int idPista) {
+    public static PistaDTO buscarPistaPorId(int idPista) throws SQLException {
         return PistasDAO.getInstance().buscarPistaPorId(idPista);
     }
 

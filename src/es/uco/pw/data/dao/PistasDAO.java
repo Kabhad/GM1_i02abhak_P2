@@ -1,17 +1,20 @@
 package es.uco.pw.data.dao;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.mysql.jdbc.Connection;
 
 import es.uco.pw.business.material.EstadoMaterial;
 import es.uco.pw.business.material.MaterialDTO;
 import es.uco.pw.business.material.TipoMaterial;
 import es.uco.pw.business.pista.PistaDTO;
 import es.uco.pw.business.pista.TamanoPista;
+import es.uco.pw.data.common.DBConnection;
 
 import java.util.*;
 import java.io.*;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * Clase que gestiona las pistas y materiales del sistema.
@@ -19,20 +22,25 @@ import java.io.*;
  */
 public class PistasDAO {
 
-    private static PistasDAO instancia; // Instancia única (Singleton)
-    private List<PistaDTO> pistaDTOs;            // Lista de pistas disponibles en el sistema
-    private List<MaterialDTO> materiales;     // Lista de materiales disponibles en el sistema
-    private String ficheroPistasPath;      // Ruta del fichero de pistas
-    private String ficheroMaterialesPath;   // Ruta del fichero de materiales
+	private Connection con;
+    private Properties prop;
 
     /**
      * Constructor privado para evitar la instanciación directa.
      * Inicializa las listas de pistas y materiales y carga las rutas de los ficheros.
      */
     private PistasDAO() {
-        this.pistaDTOs = new ArrayList<>();
-        this.materiales = new ArrayList<>();
-        this.cargarRutaFicheros(); // Cargar las rutas de los ficheros desde properties.txt
+    	prop = new Properties();
+        
+        try {
+        	BufferedReader reader = new BufferedReader(new FileReader("sql.properties"));
+        	prop.load(reader);
+        	reader.close();
+        } catch(FileNotFoundException e) {
+        	e.printStackTrace();
+        } catch(IOException e) {
+        	e.printStackTrace();
+        }
     }
 
     /**
@@ -41,149 +49,11 @@ public class PistasDAO {
      * @return La instancia única de GestorPistas.
      */
     public static synchronized PistasDAO getInstance() {
-        if (instancia == null) {
+        PistasDAO instancia = null;
+		if (instancia == null) {
             instancia = new PistasDAO();
         }
         return instancia;
-    }
-
-    /**
-     * Método para cargar la ruta de los ficheros desde properties.txt.
-     * 
-     * @throws RuntimeException Si hay un error al leer el fichero de propiedades.
-     */
-    private void cargarRutaFicheros() {
-        Properties properties = new Properties();
-        try (FileInputStream fis = new FileInputStream("src/Ficheros/properties.txt")) {
-            properties.load(fis);
-            this.ficheroPistasPath = properties.getProperty("pistasFile");
-            this.ficheroMaterialesPath = properties.getProperty("materialesFile");
-        } catch (IOException e) {
-            throw new RuntimeException("Error al leer el fichero de propiedades: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Método para cargar las pistas desde un fichero.
-     * 
-     * @throws IOException Si hay un error al leer el fichero de pistas.
-     */
-    public void cargarPistasDesdeFichero() throws IOException {
-        try (BufferedReader br = new BufferedReader(new FileReader(ficheroPistasPath))) {
-            String linea;
-            while ((linea = br.readLine()) != null) {
-                String[] datos = linea.split(";");
-                int idPista = Integer.parseInt(datos[0]);
-                String nombrePista = datos[1];
-                boolean disponible = Boolean.parseBoolean(datos[2]);
-                boolean exterior = Boolean.parseBoolean(datos[3]);
-                TamanoPista tamanioPista = TamanoPista.valueOf(datos[4]);
-                int maxJugadores = Integer.parseInt(datos[5]);
-
-                PistaDTO pistaDTO = new PistaDTO(nombrePista, disponible, exterior, tamanioPista, maxJugadores);
-                pistaDTO.setIdPista(idPista);
-
-                // Cargar materiales asociados
-                if (datos.length > 6 && !datos[6].isEmpty()) {
-                    String[] materialesIds = datos[6].split(",");
-                    for (String materialIdStr : materialesIds) {
-                        try {
-                            int idMaterial = Integer.parseInt(materialIdStr.trim());
-                            MaterialDTO materialDTO = buscarMaterialPorId(idMaterial);
-                            if (materialDTO != null) {
-                                pistaDTO.asociarMaterialAPista(materialDTO);
-                            }
-                        } catch (NumberFormatException e) {
-                            throw new IllegalArgumentException("Error al parsear el ID de material: " + materialIdStr);
-                        }
-                    }
-                }
-                pistaDTOs.add(pistaDTO);
-            }
-        }
-    }
-
-    /**
-     * Método para guardar las pistas en un fichero.
-     * 
-     * @throws IOException Si hay un error al escribir en el fichero de pistas.
-     */
-    public void guardarPistasEnFichero() throws IOException {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(ficheroPistasPath))) {
-            for (PistaDTO pistaDTO : pistaDTOs) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(pistaDTO.getIdPista()).append(";")
-                  .append(pistaDTO.getNombrePista()).append(";")
-                  .append(pistaDTO.isDisponible()).append(";")
-                  .append(pistaDTO.isExterior()).append(";")
-                  .append(pistaDTO.getPista().name()).append(";")
-                  .append(pistaDTO.getMax_jugadores());
-
-                List<MaterialDTO> materiales = pistaDTO.getMateriales();
-                if (!materiales.isEmpty()) {
-                    sb.append(";");
-                    for (int i = 0; i < materiales.size(); i++) {
-                        sb.append(materiales.get(i).getId());
-                        if (i < materiales.size() - 1) {
-                            sb.append(",");
-                        }
-                    }
-                }
-                bw.write(sb.toString());
-                bw.newLine();
-            }
-        }
-    }
-
-    /**
-     * Método para cargar los materiales desde un fichero.
-     * 
-     * @throws IOException Si hay un error al leer el fichero de materiales.
-     */
-    public void cargarMaterialesDesdeFichero() throws IOException {
-        try (BufferedReader br = new BufferedReader(new FileReader(ficheroMaterialesPath))) {
-            String linea;
-            while ((linea = br.readLine()) != null) {
-                if (!linea.trim().isEmpty()) {
-                    String[] datos = linea.split(";");
-                    if (datos.length >= 4) {
-                        try {
-                            int idMaterial = Integer.parseInt(datos[0].trim());
-                            TipoMaterial tipo = TipoMaterial.valueOf(datos[1].trim());
-                            boolean usoExterior = Boolean.parseBoolean(datos[2].trim());
-                            EstadoMaterial estado = EstadoMaterial.valueOf(datos[3].trim());
-
-                            MaterialDTO materialDTO = new MaterialDTO(idMaterial, tipo, usoExterior, estado);
-                            materiales.add(materialDTO);
-                        } catch (NumberFormatException e) {
-                            throw new IllegalArgumentException("Error al parsear material en la línea: " + linea);
-                        }
-                    } else {
-                        throw new IllegalArgumentException("Línea incompleta en el fichero de materiales: " + linea);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Método para guardar los materiales en un fichero.
-     * 
-     * @throws IOException Si hay un error al escribir en el fichero de materiales.
-     */
-    public void guardarMaterialesEnFichero() throws IOException {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(ficheroMaterialesPath))) {
-            for (MaterialDTO materialDTO : materiales) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(materialDTO.getId()).append(";")
-                  .append(materialDTO.getTipo().name()).append(";")
-                  .append(materialDTO.isUsoExterior()).append(";")
-                  .append(materialDTO.getEstado().name());
-
-                bw.write(sb.toString());
-                bw.newLine();
-            }
-        }
     }
 
     /**
@@ -195,9 +65,21 @@ public class PistasDAO {
      * @param pista        Tamaño de la pista.
      * @param maxJugadores Número máximo de jugadores en la pista.
      */
-    public void crearPista(String nombre, boolean disponible, boolean exterior, TamanoPista pista, int maxJugadores) {
-        PistaDTO nuevaPista = new PistaDTO(nombre, disponible, exterior, pista, maxJugadores);
-        pistaDTOs.add(nuevaPista);
+    public void crearPista(String nombre, boolean disponible, boolean exterior, TamanoPista pista, int maxJugadores) throws SQLException {
+    	DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("crearPista");
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nombre);
+            ps.setBoolean(2, disponible);
+            ps.setBoolean(3, exterior);
+            ps.setString(4, pista.name());
+            ps.setInt(5, maxJugadores);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -208,11 +90,22 @@ public class PistasDAO {
      * @param usoExterior Indica si el material es para uso exterior.
      * @param estado      Estado del nuevo material.
      */
-    public void crearMaterial(int id, TipoMaterial tipo, boolean usoExterior, EstadoMaterial estado) {
-        MaterialDTO nuevoMaterial = new MaterialDTO(id, tipo, usoExterior, estado);
-        materiales.add(nuevoMaterial);
-    }
+    public void crearMaterial(int id, TipoMaterial tipo, boolean usoExterior, EstadoMaterial estado) throws SQLException {
+    	 DBConnection conexion = new DBConnection();
+         con = (Connection) conexion.getConnection();
+         String sql = prop.getProperty("crearMaterial");
 
+         try (PreparedStatement ps = con.prepareStatement(sql)) {
+             ps.setInt(1, id);
+             ps.setString(2, tipo.name());
+             ps.setBoolean(3, usoExterior);
+             ps.setString(4, estado.name());
+             ps.executeUpdate();
+         } catch (SQLException e) {
+             e.printStackTrace();
+         }
+     }
+    
     /**
      * Método para asociar un material a una pista disponible.
      * 
@@ -221,33 +114,30 @@ public class PistasDAO {
      * @return True si la asociación fue exitosa, false en caso contrario.
      * @throws IllegalArgumentException Si la pista o el material no existen, o si la pista o el material no están disponibles.
      */
-    public boolean asociarMaterialAPista(String nombrePista, int idMaterial) {
-        PistaDTO pistaSeleccionada = buscarPistaPorNombre(nombrePista);
-        MaterialDTO materialSeleccionado = buscarMaterialPorId(idMaterial);
+    public boolean asociarMaterialAPista(String nombrePista, int idMaterial) throws SQLException { //error enseñar angel
+    	DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("asociarMaterialAPista");
 
-        if (pistaSeleccionada == null) {
-            throw new IllegalArgumentException("La pista no existe.");
-        }
+        try {
+            PistaDTO pistaSeleccionada = buscarPistaPorNombre(nombrePista);
+            MaterialDTO materialSeleccionado = buscarMaterialPorId(idMaterial);
 
-        if (materialSeleccionado == null) {
-            throw new IllegalArgumentException("El material no existe.");
-        }
-
-        if (!pistaSeleccionada.isDisponible()) {
-            throw new IllegalArgumentException("La pista no está disponible.");
-        }
-
-        if (materialSeleccionado.getEstado() != EstadoMaterial.DISPONIBLE) {
-            throw new IllegalArgumentException("El material no está disponible.");
-        }
-
-        for (PistaDTO pistaDTO : pistaDTOs) {
-            if (pistaDTO.getMateriales().contains(materialSeleccionado)) {
-                throw new IllegalArgumentException("El material ya está asignado a otra pista.");
+            if (pistaSeleccionada == null || !pistaSeleccionada.isDisponible() ||
+                materialSeleccionado == null || materialSeleccionado.getEstado() != EstadoMaterial.DISPONIBLE) {
+                throw new IllegalArgumentException("La pista o el material no están disponibles.");
             }
-        }
 
-        return pistaSeleccionada.asociarMaterialAPista(materialSeleccionado);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setString(1, nombrePista);
+                ps.setInt(2, idMaterial);
+                ps.executeUpdate();
+                return true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     /**
@@ -256,11 +146,22 @@ public class PistasDAO {
      * @param nombrePista Nombre de la pista a buscar.
      * @return La pista correspondiente al nombre dado, o null si no se encuentra.
      */
-    private PistaDTO buscarPistaPorNombre(String nombrePista) {
-        for (PistaDTO pistaDTO : pistaDTOs) {
-            if (pistaDTO.getNombrePista().equalsIgnoreCase(nombrePista)) {
-                return pistaDTO;
+    private PistaDTO buscarPistaPorNombre(String nombrePista) throws SQLException {
+    	DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("buscarPistaPorNombre");
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, nombrePista);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"),
+                                        rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")),
+                                        rs.getInt("maxJugadores"));
+                }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return null;
     }
@@ -271,11 +172,21 @@ public class PistasDAO {
      * @param idMaterial ID del material a buscar.
      * @return El material correspondiente al ID dado, o null si no se encuentra.
      */
-    private MaterialDTO buscarMaterialPorId(int idMaterial) {
-        for (MaterialDTO materialDTO : materiales) {
-            if (materialDTO.getId() == idMaterial) {
-                return materialDTO;
+    private MaterialDTO buscarMaterialPorId(int idMaterial) throws SQLException {
+    	DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("buscarMaterialPorId");
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idMaterial);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new MaterialDTO(rs.getInt("idMaterial"), TipoMaterial.valueOf(rs.getString("tipo")),
+                                           rs.getBoolean("usoExterior"), EstadoMaterial.valueOf(rs.getString("estado")));
+                }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return null;
     }
@@ -285,10 +196,23 @@ public class PistasDAO {
      * 
      * @return Lista de pistas disponibles.
      */
-    public List<PistaDTO> buscarPistasDisponibles() {
-        return pistaDTOs.stream()
-                     .filter(PistaDTO::isDisponible)
-                     .collect(Collectors.toList());
+    public List<PistaDTO> buscarPistasDisponibles() throws SQLException {
+    	List<PistaDTO> pistas = new ArrayList<>();
+        DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("buscarPistasDisponibles");
+
+        try (PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                pistas.add(new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"),
+                                        rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")),
+                                        rs.getInt("maxJugadores")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return pistas;
     }
 
     /**
@@ -296,10 +220,23 @@ public class PistasDAO {
      * 
      * @return Lista de pistas no disponibles.
      */
-    public List<PistaDTO> listarPistasNoDisponibles() {
-        return pistaDTOs.stream()
-                     .filter(pista -> !pista.isDisponible())
-                     .collect(Collectors.toList());
+    public List<PistaDTO> listarPistasNoDisponibles() throws SQLException {
+    	List<PistaDTO> pistas = new ArrayList<>();
+        DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("listarPistasNoDisponibles");
+
+        try (PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                pistas.add(new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"),
+                                        rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")),
+                                        rs.getInt("maxJugadores")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return pistas;
     }
 
     /**
@@ -309,10 +246,22 @@ public class PistasDAO {
      * @param tipoPista    Tipo de pista que se busca.
      * @return Lista de pistas disponibles que cumplen con los criterios dados.
      */
-    public List<PistaDTO> buscarPistasDisponibles(int numJugadores, TamanoPista tipoPista) {
-        return pistaDTOs.stream()
-                     .filter(pista -> pista.isDisponible() && pista.getPista() == tipoPista && pista.getMax_jugadores() >= numJugadores)
-                     .collect(Collectors.toList());
+    public List<PistaDTO> buscarPistasDisponibles(int numJugadores, TamanoPista tipoPista) throws SQLException {
+        String sql = prop.getProperty("buscarPistasDisponibles");
+        List<PistaDTO> pistasFiltradas = new ArrayList<>();
+        
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+        	ps.setInt(1, numJugadores);
+        	ps.setString(2,  tipoPista.name());
+        	ResultSet rs = ps.executeQuery();
+        	
+        	while(rs.next()) {
+        		PistaDTO pista = new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"), rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")), rs.getInt("maxJugadores"));
+        		pista.setIdPista(rs.getInt("id"));
+        		pistasFiltradas.add(pista);
+        	}
+        }
+        return pistasFiltradas;
     }
 
     /**
@@ -320,27 +269,16 @@ public class PistasDAO {
      * 
      * @return String con los detalles de todas las pistas.
      */
-    public String listarPistas() {
-        StringBuilder resultado = new StringBuilder();
-        for (PistaDTO pistaDTO : pistaDTOs) {
-            resultado.append("ID: ").append(pistaDTO.getIdPista()).append("\n")
-                     .append("Nombre Pista: ").append(pistaDTO.getNombrePista()).append("\n")
-                     .append("Disponible: ").append(pistaDTO.isDisponible() ? "Sí" : "No").append("\n")
-                     .append("Exterior: ").append(pistaDTO.isExterior() ? "Sí" : "No").append("\n")
-                     .append("Tamaño Pista: ").append(pistaDTO.getPista().toString()).append("\n")
-                     .append("Max Jugadores: ").append(pistaDTO.getMax_jugadores()).append("\n")
-                     .append("Materiales: ");
-            
-            if (pistaDTO.getMateriales().isEmpty()) {
-                resultado.append("[]\n");
-            } else {
-                List<Integer> idsMateriales = pistaDTO.getMateriales().stream().map(MaterialDTO::getId).collect(Collectors.toList());
-                resultado.append(idsMateriales).append("\n");
+    public List<PistaDTO> listarPistas() throws SQLException {
+        String sql = prop.getProperty("listarPistas");
+        List<PistaDTO> pistas = new ArrayList<>();
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                pistas.add(new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"), rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")), rs.getInt("maxJugadores")));
             }
-
-            resultado.append("----------------------------------\n");
         }
-        return resultado.toString();
+        return pistas;
     }
 
     /**
@@ -349,11 +287,17 @@ public class PistasDAO {
      * @param idPista ID de la pista a buscar.
      * @return La pista correspondiente al ID dado, o null si no se encuentra.
      */
-    public PistaDTO buscarPistaPorId(int idPista) {
-        for (PistaDTO pistaDTO : pistaDTOs) {
-            if (pistaDTO.getIdPista() == idPista) {
-                return pistaDTO;
-            }
+    public PistaDTO buscarPistaPorId(int idPista) throws  SQLException {
+    	String sql = prop.getProperty("buscarPistaPorId");
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+        	ps.setInt(1, idPista);
+        	ResultSet rs = ps.executeQuery();
+        	
+        	if(rs.next()) {
+        		PistaDTO pista = new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"), rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")), rs.getInt("maxJugadores"));
+        		pista.setIdPista(rs.getInt("id"));
+        		return pista;
+        	}
         }
         return null;
     }

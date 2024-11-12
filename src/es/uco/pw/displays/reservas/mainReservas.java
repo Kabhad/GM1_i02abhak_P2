@@ -5,6 +5,7 @@ import es.uco.pw.business.pista.PistaDTO;
 import es.uco.pw.business.reserva.*;
 import es.uco.pw.data.dao.ReservasDAO;
 
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -41,8 +42,9 @@ public class mainReservas {
      * Método principal que inicia el gestor de reservas.
      * 
      * @param sc Scanner para la entrada del usuario.
+     * @throws SQLException 
      */
-    public static void main(Scanner sc, ReservasDAO reservasDAO) {
+    public static void main(Scanner sc, ReservasDAO reservasDAO) throws SQLException {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         int opcion;
         boolean continuar = true;

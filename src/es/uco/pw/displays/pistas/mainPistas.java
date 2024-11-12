@@ -1,5 +1,6 @@
 package es.uco.pw.displays.pistas;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -36,8 +37,9 @@ public class mainPistas {
      * Método principal para gestionar las opciones del menú.
      *
      * @param sc Objeto Scanner para la entrada de datos del usuario.
+     * @throws SQLException 
      */
-    public static void main(Scanner sc) {
+    public static void main(Scanner sc) throws SQLException {
         PistasDAO pistasDAO = PistasDAO.getInstance();
         int opcion;
 
@@ -58,11 +60,11 @@ public class mainPistas {
                         boolean exterior = sc.nextBoolean();
                         System.out.println("Tipo de pista (1: MINIBASKET, 2: ADULTOS, 3: 3VS3): ");
                         int tipoPista = sc.nextInt();
-                        TamanoPista tamanio = tipoPista == 1 ? TamanoPista.MINIBASKET
+                        TamanoPista tamanoPista = tipoPista == 1 ? TamanoPista.MINIBASKET
                                 : tipoPista == 2 ? TamanoPista.ADULTOS : TamanoPista._3VS3;
                         System.out.print("Máximo número de jugadores: ");
                         int maxJugadores = sc.nextInt();
-                        pistasDAO.crearPista(nombrePista, disponible, exterior, tamanio, maxJugadores);
+                        pistasDAO.crearPista(nombrePista, disponible, exterior, tamanoPista, maxJugadores);
                         System.out.println("Pista creada con éxito.");
                     } catch (Exception e) {
                         System.out.println("Error al crear la pista: " + e.getMessage());
