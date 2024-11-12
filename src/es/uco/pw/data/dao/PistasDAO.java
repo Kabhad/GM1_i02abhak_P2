@@ -14,7 +14,6 @@ import java.io.*;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 /**
  * Clase que gestiona las pistas y materiales del sistema.
@@ -22,7 +21,7 @@ import java.sql.Statement;
  */
 public class PistasDAO {
 
-	private Connection con;
+	private java.sql.Connection con;
     private Properties prop;
 
     /**
@@ -30,27 +29,31 @@ public class PistasDAO {
      * Inicializa las listas de pistas y materiales y carga las rutas de los ficheros.
      */
     private PistasDAO() {
-    	prop = new Properties();
-        
+        prop = new Properties();
+
         try {
-        	BufferedReader reader = new BufferedReader(new FileReader("sql.properties"));
-        	prop.load(reader);
-        	reader.close();
-        } catch(FileNotFoundException e) {
-        	e.printStackTrace();
-        } catch(IOException e) {
-        	e.printStackTrace();
+            BufferedReader reader = new BufferedReader(new FileReader("sql.properties"));
+            prop.load(reader);
+            reader.close();
+        } catch (FileNotFoundException e) {
+            System.err.println("Archivo 'sql.properties' no encontrado.");
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.err.println("Error al leer 'sql.properties'.");
+            e.printStackTrace();
         }
     }
+
 
     /**
      * Método estático para obtener la única instancia del gestor.
      * 
      * @return La instancia única de GestorPistas.
      */
+    private static PistasDAO instancia = null;
+
     public static synchronized PistasDAO getInstance() {
-        PistasDAO instancia = null;
-		if (instancia == null) {
+        if (instancia == null) {
             instancia = new PistasDAO();
         }
         return instancia;
@@ -197,23 +200,45 @@ public class PistasDAO {
      * @return Lista de pistas disponibles.
      */
     public List<PistaDTO> buscarPistasDisponibles() throws SQLException {
-    	List<PistaDTO> pistas = new ArrayList<>();
+        List<PistaDTO> pistas = new ArrayList<>();
         DBConnection conexion = new DBConnection();
-        con = (Connection) conexion.getConnection();
-        String sql = prop.getProperty("buscarPistasDisponibles");
+        this.con = (java.sql.Connection) conexion.getConnection(); // Casting explícito y uso de 'this.con'
 
-        try (PreparedStatement ps = con.prepareStatement(sql);
+        if (this.con == null) {
+            System.err.println("Error: No se pudo obtener la conexión a la base de datos.");
+            return pistas;
+        }
+
+        if (this.prop == null) {
+            System.err.println("Error: Las propiedades 'prop' no están inicializadas.");
+            return pistas;
+        }
+
+        String sql = prop.getProperty("buscarPistasDisponibles");
+        if (sql == null || sql.isEmpty()) {
+            System.err.println("Error: La consulta SQL para 'buscarPistasDisponibles' no está definida o está vacía.");
+            return pistas;
+        }
+
+        try (PreparedStatement ps = this.con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                pistas.add(new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"),
-                                        rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")),
-                                        rs.getInt("maxJugadores")));
+                pistas.add(new PistaDTO(
+                    rs.getString("nombre"),
+                    rs.getBoolean("disponible"),
+                    rs.getBoolean("exterior"),
+                    TamanoPista.valueOf(rs.getString("tamanoPista")),
+                    rs.getInt("maxJugadores")
+                ));
             }
         } catch (SQLException e) {
+            System.err.println("Error al ejecutar la consulta de pistas disponibles.");
             e.printStackTrace();
         }
+
         return pistas;
     }
+
 
     /**
      * Método para listar todas las pistas no disponibles.
@@ -247,22 +272,57 @@ public class PistasDAO {
      * @return Lista de pistas disponibles que cumplen con los criterios dados.
      */
     public List<PistaDTO> buscarPistasDisponibles(int numJugadores, TamanoPista tipoPista) throws SQLException {
-        String sql = prop.getProperty("buscarPistasDisponibles");
         List<PistaDTO> pistasFiltradas = new ArrayList<>();
-        
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-        	ps.setInt(1, numJugadores);
-        	ps.setString(2,  tipoPista.name());
-        	ResultSet rs = ps.executeQuery();
-        	
-        	while(rs.next()) {
-        		PistaDTO pista = new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"), rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")), rs.getInt("maxJugadores"));
-        		pista.setIdPista(rs.getInt("id"));
-        		pistasFiltradas.add(pista);
-        	}
+
+        // Inicializamos la conexión
+        DBConnection conexion = new DBConnection();
+        this.con = conexion.getConnection();
+
+        // Verificamos que la conexión no sea null
+        if (this.con == null) {
+            System.err.println("Error: No se pudo obtener la conexión a la base de datos.");
+            return pistasFiltradas;
         }
+
+        // Verificamos que 'prop' no sea null
+        if (this.prop == null) {
+            System.err.println("Error: Las propiedades 'prop' no están inicializadas.");
+            return pistasFiltradas;
+        }
+
+        // Obtenemos la consulta SQL
+        String sql = this.prop.getProperty("buscarPistasDisponibles");
+        if (sql == null || sql.isEmpty()) {
+            System.err.println("Error: La consulta SQL para 'buscarPistasDisponibles' no está definida o está vacía.");
+            return pistasFiltradas;
+        }
+
+        try (PreparedStatement ps = this.con.prepareStatement(sql)) {
+            ps.setInt(1, numJugadores);
+            ps.setString(2, tipoPista.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    PistaDTO pista = new PistaDTO(
+                        rs.getString("nombre"),
+                        rs.getBoolean("disponible"),
+                        rs.getBoolean("exterior"),
+                        TamanoPista.valueOf(rs.getString("tamanoPista")),
+                        rs.getInt("maxJugadores")
+                    );
+                    // Utiliza el nombre correcto de la columna de identificación
+                    pista.setIdPista(rs.getInt("idPista")); 
+                    pistasFiltradas.add(pista);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al ejecutar la consulta de pistas disponibles.");
+            e.printStackTrace();
+        }
+
         return pistasFiltradas;
     }
+
+
 
     /**
      * Método para listar todas las pistas con sus detalles.
@@ -270,16 +330,44 @@ public class PistasDAO {
      * @return String con los detalles de todas las pistas.
      */
     public List<PistaDTO> listarPistas() throws SQLException {
-        String sql = prop.getProperty("listarPistas");
         List<PistaDTO> pistas = new ArrayList<>();
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                pistas.add(new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"), rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")), rs.getInt("maxJugadores")));
+        String sql = this.prop.getProperty("listarPistas");
+
+        if (sql == null || sql.isEmpty()) {
+            System.err.println("Error: La consulta SQL para 'listarPistas' no está definida o está vacía.");
+            return pistas;
+        }
+
+        // Inicializamos la conexión si aún no está inicializada
+        if (this.con == null) {
+            DBConnection conexion = new DBConnection();
+            this.con = conexion.getConnection();
+            if (this.con == null) {
+                System.err.println("Error: No se pudo obtener la conexión a la base de datos.");
+                return pistas;
             }
         }
+
+        try (PreparedStatement ps = this.con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                PistaDTO pista = new PistaDTO(
+                    rs.getString("nombre"),
+                    rs.getBoolean("disponible"),
+                    rs.getBoolean("exterior"),
+                    TamanoPista.valueOf(rs.getString("tamanoPista")),
+                    rs.getInt("maxJugadores")
+                );
+                pistas.add(pista);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al ejecutar la consulta de listar pistas.");
+            e.printStackTrace();
+        }
+
         return pistas;
     }
+
 
     /**
      * Método para buscar una pista por su ID.

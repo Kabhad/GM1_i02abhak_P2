@@ -1,14 +1,19 @@
 package es.uco.pw.data.dao;
 
-import java.util.ArrayList;
+
 import java.util.Date;
 import java.util.List;
 import java.io.*;
-import java.text.ParseException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Properties;
 
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+
 import es.uco.pw.business.jugador.JugadorDTO;
+import es.uco.pw.data.common.DBConnection;
 
 /**
  * Clase que gestiona los jugadores registrados en el sistema. Permite operaciones como
@@ -17,7 +22,6 @@ import es.uco.pw.business.jugador.JugadorDTO;
  */
 public class JugadoresDAO {
     
-	private String ficheroJugadoresPath;
 	private List<JugadorDTO> listaJugadores;
     private Connection con;
     private Properties prop;
@@ -287,76 +291,6 @@ public class JugadoresDAO {
                 e.printStackTrace();
             }
         }	
-    }
-
-    /**
-     * Carga la ruta de los archivos desde un archivo de propiedades.
-     */
-    private void cargarRutaFicheros() {
-        Properties properties = new Properties();
-        try (FileInputStream fis = new FileInputStream("src/Ficheros/properties.txt")) {
-            properties.load(fis);
-            this.ficheroJugadoresPath = properties.getProperty("jugadoresFile");
-        } catch (IOException e) {
-            throw new RuntimeException("Error al leer el fichero de propiedades: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Carga jugadores desde un archivo CSV.
-     *
-     * @return Mensaje indicando el resultado de la carga.
-     */
-    public String cargarJugadoresDesdeFichero() {
-        try (BufferedReader br = new BufferedReader(new FileReader(ficheroJugadoresPath))) {
-            String linea;
-            while ((linea = br.readLine()) != null) {
-                String[] datos = linea.split(";");
-                int idJugador = Integer.parseInt(datos[0]);
-                String nombreApellidos = datos[1];
-                Date fechaNacimiento = new SimpleDateFormat("yyyy-MM-dd").parse(datos[2]);
-                String fechaInscripcionStr = datos[3];
-                String correoElectronico = datos[4];
-                boolean cuentaActiva = Boolean.parseBoolean(datos[5]);
-
-                JugadorDTO jugadorDTO = new JugadorDTO(nombreApellidos, fechaNacimiento, correoElectronico);
-                jugadorDTO.setIdJugador(idJugador);
-                jugadorDTO.setFechaInscripcion("null".equals(fechaInscripcionStr) ? null :
-                    new SimpleDateFormat("yyyy-MM-dd").parse(fechaInscripcionStr));
-                jugadorDTO.setCuentaActiva(cuentaActiva);
-
-                listaJugadores.add(jugadorDTO);
-            }
-            return "Jugadores cargados desde el fichero CSV.";
-        } catch (IOException | ParseException e) {
-            return "Error al cargar los jugadores: " + e.getMessage();
-        }
-    }
-
-    /**
-     * Guarda los jugadores en un archivo CSV.
-     *
-     * @return Mensaje indicando el resultado del guardado.
-     */
-    public String guardarJugadoresEnFichero() {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(ficheroJugadoresPath))) {
-            for (JugadorDTO jugadorDTO : listaJugadores) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(jugadorDTO.getIdJugador()).append(";")
-                  .append(jugadorDTO.getNombreApellidos()).append(";")
-                  .append(new SimpleDateFormat("yyyy-MM-dd").format(jugadorDTO.getFechaNacimiento())).append(";")
-                  .append(jugadorDTO.getFechaInscripcion() != null ? 
-                      new SimpleDateFormat("yyyy-MM-dd").format(jugadorDTO.getFechaInscripcion()) : "null").append(";")
-                  .append(jugadorDTO.getCorreoElectronico()).append(";")
-                  .append(jugadorDTO.isCuentaActiva());
-                
-                bw.write(sb.toString());
-                bw.newLine();
-            }
-            return "Jugadores guardados en el fichero CSV.";
-        } catch (IOException e) {
-            return "Error al guardar los jugadores: " + e.getMessage();
-        }
     }
 
     /**
