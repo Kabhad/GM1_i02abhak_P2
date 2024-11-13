@@ -28,7 +28,7 @@ public class PistasDAO {
      * Constructor privado para evitar la instanciación directa.
      * Inicializa las listas de pistas y materiales y carga las rutas de los ficheros.
      */
-    private PistasDAO() {
+    public PistasDAO() {
         prop = new Properties();
 
         try {
@@ -44,21 +44,6 @@ public class PistasDAO {
         }
     }
 
-
-    /**
-     * Método estático para obtener la única instancia del gestor.
-     * 
-     * @return La instancia única de GestorPistas.
-     */
-    private static PistasDAO instancia = null;
-
-    public static synchronized PistasDAO getInstance() {
-        if (instancia == null) {
-            instancia = new PistasDAO();
-        }
-        return instancia;
-    }
-
     /**
      * Método para crear una nueva pista y añadirla a la lista de pistas.
      * 
@@ -69,21 +54,33 @@ public class PistasDAO {
      * @param maxJugadores Número máximo de jugadores en la pista.
      */
     public void crearPista(String nombre, boolean disponible, boolean exterior, TamanoPista pista, int maxJugadores) throws SQLException {
-    	DBConnection conexion = new DBConnection();
+        DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
+
+        // Usar el método buscarPistaPorNombre para verificar si el nombre ya existe
+        PistaDTO pistaE = buscarPistaPorNombre(nombre);
+        if (pistaE != null) { // Si se encuentra una pista con el mismo nombre
+            throw new IllegalArgumentException("Ya existe una pista con el nombre especificado.");
+        }
+
+        // Consulta para insertar una nueva pista
         String sql = prop.getProperty("crearPista");
 
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
+        try {
+            // Crear la nueva pista si el nombre no existe
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setString(1, nombre);
             ps.setBoolean(2, disponible);
             ps.setBoolean(3, exterior);
             ps.setString(4, pista.name());
             ps.setInt(5, maxJugadores);
             ps.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+            ps.close();
+        } finally {
+            conexion.closeConnection();
         }
     }
+
 
     /**
      * Método para crear un nuevo material y añadirlo a la lista de materiales.
@@ -93,21 +90,34 @@ public class PistasDAO {
      * @param usoExterior Indica si el material es para uso exterior.
      * @param estado      Estado del nuevo material.
      */
-    public void crearMaterial(int id, TipoMaterial tipo, boolean usoExterior, EstadoMaterial estado) throws SQLException {
-    	 DBConnection conexion = new DBConnection();
-         con = (Connection) conexion.getConnection();
-         String sql = prop.getProperty("crearMaterial");
+    public void crearMaterial(int idMaterial, TipoMaterial tipo, boolean usoExterior, EstadoMaterial estado) throws SQLException {
+        DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
 
-         try (PreparedStatement ps = con.prepareStatement(sql)) {
-             ps.setInt(1, id);
-             ps.setString(2, tipo.name());
-             ps.setBoolean(3, usoExterior);
-             ps.setString(4, estado.name());
-             ps.executeUpdate();
-         } catch (SQLException e) {
-             e.printStackTrace();
-         }
-     }
+        // Usar el método buscarMaterialPorId para verificar si el idMaterial ya existe
+        MaterialDTO materialExistente = buscarMaterialPorId(idMaterial);
+        if (materialExistente != null) { // Si se encuentra un material con el mismo ID
+            throw new IllegalArgumentException("Ya existe un material con el ID especificado.");
+        }
+
+        // Consulta para insertar un nuevo material
+        String sql = "INSERT INTO Material (idMaterial, tipo, usoExterior, estado) VALUES (?, ?, ?, ?)";
+
+        try {
+            // Crear el nuevo material si el idMaterial no existe
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setInt(1, idMaterial);
+            ps.setString(2, tipo.name());
+            ps.setBoolean(3, usoExterior);
+            ps.setString(4, estado.name());
+            ps.executeUpdate();
+            ps.close();
+        } finally {
+            conexion.closeConnection();
+        }
+    }
+
+
     
     /**
      * Método para asociar un material a una pista disponible.
@@ -117,25 +127,120 @@ public class PistasDAO {
      * @return True si la asociación fue exitosa, false en caso contrario.
      * @throws IllegalArgumentException Si la pista o el material no existen, o si la pista o el material no están disponibles.
      */
-    public boolean asociarMaterialAPista(String nombrePista, int idMaterial) throws SQLException { //error enseñar angel
-    	DBConnection conexion = new DBConnection();
+    public boolean asociarMaterialAPista(String nombrePista, int idMaterial) throws SQLException {
+        DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
-        String sql = prop.getProperty("asociarMaterialAPista");
 
-        try {
-            PistaDTO pistaSeleccionada = buscarPistaPorNombre(nombrePista);
-            MaterialDTO materialSeleccionado = buscarMaterialPorId(idMaterial);
+        // Consulta para obtener el idPista y su estado de disponibilidad basado en el nombre de la pista
+        String buscarPistaPorNombre = prop.getProperty("buscarPistaPorNombre");
 
-            if (pistaSeleccionada == null || !pistaSeleccionada.isDisponible() ||
-                materialSeleccionado == null || materialSeleccionado.getEstado() != EstadoMaterial.DISPONIBLE) {
-                throw new IllegalArgumentException("La pista o el material no están disponibles.");
+        // Consulta para obtener el estado del material
+        String obtenerEstadoMaterial = "SELECT idMaterial, tipo, usoExterior, estado FROM Material WHERE idMaterial = ?";
+
+        // Consulta para asociar el material a la pista
+        String asociarMaterialAPista = prop.getProperty("asociarMaterialAPista");
+
+        // Consulta para actualizar el estado del material
+        String actualizarEstadoMaterial = "UPDATE Material SET estado = 'RESERVADO' WHERE idMaterial = ?";
+
+        try (PreparedStatement psEstado = con.prepareStatement(obtenerEstadoMaterial)) {
+            // Verificar el estado y las propiedades del material
+            psEstado.setInt(1, idMaterial);
+            ResultSet rsEstado = psEstado.executeQuery();
+
+            if (!rsEstado.next()) {
+                System.out.println("No se encontró el material con el ID especificado.");
+                return false;
             }
 
-            try (PreparedStatement ps = con.prepareStatement(sql)) {
-                ps.setString(1, nombrePista);
-                ps.setInt(2, idMaterial);
-                ps.executeUpdate();
-                return true;
+            // Obtener las propiedades del material
+            TipoMaterial tipoMaterial = TipoMaterial.valueOf(rsEstado.getString("tipo"));
+            boolean usoExteriorMaterial = rsEstado.getBoolean("usoExterior");
+            String estadoMaterial = rsEstado.getString("estado");
+
+            if ("MAL_ESTADO".equals(estadoMaterial) || "RESERVADO".equals(estadoMaterial)) {
+                System.out.println("El material no se puede asociar porque está en MAL_ESTADO o ya está RESERVADO.");
+                return false;
+            }
+            rsEstado.close();
+
+            // Buscar la pista por nombre y verificar su tipo
+            try (PreparedStatement psBuscar = con.prepareStatement(buscarPistaPorNombre)) {
+                psBuscar.setString(1, nombrePista);
+                ResultSet rs = psBuscar.executeQuery();
+
+                if (!rs.next()) {
+                    System.out.println("No se encontró la pista con el nombre especificado.");
+                    return false;
+                }
+
+                int idPista = rs.getInt("idPista");
+                boolean esExterior = rs.getBoolean("exterior");
+
+                // Verificar si el material es adecuado para la pista
+                if (esExterior && !usoExteriorMaterial) {
+                    System.out.println("El material no se puede usar en una pista exterior porque no es apto para exteriores.");
+                    return false;
+                }
+
+                // Verificar las limitaciones de cantidad de materiales
+                String verificarMateriales = "SELECT tipo, COUNT(*) AS cantidad FROM Material WHERE idPista = ? GROUP BY tipo";
+                try (PreparedStatement psVerificar = con.prepareStatement(verificarMateriales)) {
+                    psVerificar.setInt(1, idPista);
+                    ResultSet rsVerificar = psVerificar.executeQuery();
+
+                    int pelotas = 0, canastas = 0, conos = 0;
+                    while (rsVerificar.next()) {
+                        TipoMaterial tipo = TipoMaterial.valueOf(rsVerificar.getString("tipo"));
+                        int cantidad = rsVerificar.getInt("cantidad");
+                        switch (tipo) {
+                            case PELOTAS:
+                                pelotas = cantidad;
+                                break;
+                            case CANASTAS:
+                                canastas = cantidad;
+                                break;
+                            case CONOS:
+                                conos = cantidad;
+                                break;
+                        }
+                    }
+
+                    // Limitar el número de materiales
+                    if (tipoMaterial == TipoMaterial.PELOTAS && pelotas >= 12) {
+                        System.out.println("No se pueden añadir más de 12 pelotas a la pista.");
+                        return false;
+                    }
+                    if (tipoMaterial == TipoMaterial.CANASTAS && canastas >= 2) {
+                        System.out.println("No se pueden añadir más de 2 canastas a la pista.");
+                        return false;
+                    }
+                    if (tipoMaterial == TipoMaterial.CONOS && conos >= 20) {
+                        System.out.println("No se pueden añadir más de 20 conos a la pista.");
+                        return false;
+                    }
+                }
+
+                // Asignar el idPista al material encontrado
+                try (PreparedStatement psAsociar = con.prepareStatement(asociarMaterialAPista)) {
+                    psAsociar.setInt(1, idPista);
+                    psAsociar.setInt(2, idMaterial);
+                    int filasActualizadas = psAsociar.executeUpdate();
+
+                    if (filasActualizadas > 0) {
+                        // Actualizar el estado del material a RESERVADO
+                        try (PreparedStatement psActualizarEstado = con.prepareStatement(actualizarEstadoMaterial)) {
+                            psActualizarEstado.setInt(1, idMaterial);
+                            psActualizarEstado.executeUpdate();
+                        }
+
+                        System.out.println("Material asociado con éxito a la pista y estado actualizado a RESERVADO.");
+                        return true;
+                    } else {
+                        System.out.println("No se pudo asociar el material. Verifica que el material esté disponible.");
+                        return false;
+                    }
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -143,6 +248,7 @@ public class PistasDAO {
         return false;
     }
 
+    
     /**
      * Método auxiliar para buscar una pista por su nombre.
      * 
@@ -246,23 +352,62 @@ public class PistasDAO {
      * @return Lista de pistas no disponibles.
      */
     public List<PistaDTO> listarPistasNoDisponibles() throws SQLException {
-    	List<PistaDTO> pistas = new ArrayList<>();
+        List<PistaDTO> pistas = new ArrayList<>();
         DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
         String sql = prop.getProperty("listarPistasNoDisponibles");
 
         try (PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
+
+            Map<Integer, PistaDTO> mapaPistas = new HashMap<>();
+
             while (rs.next()) {
-                pistas.add(new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"),
-                                        rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")),
-                                        rs.getInt("maxJugadores")));
+                int idPista = rs.getInt("idPista");  // Obtener el idPista
+                String nombrePista = rs.getString("nombre");
+
+                // Si la pista no está ya en el mapa, la agregamos
+                if (!mapaPistas.containsKey(idPista)) {
+                    PistaDTO pista = new PistaDTO(
+                        idPista,  // Asegúrate de tener un constructor adecuado en PistaDTO
+                        nombrePista,
+                        rs.getBoolean("disponible"),
+                        rs.getBoolean("exterior"),
+                        TamanoPista.valueOf(rs.getString("tamanoPista")),
+                        rs.getInt("maxJugadores")
+                    );
+                    mapaPistas.put(idPista, pista);
+                }
+
+                // Obtenemos la pista del mapa
+                PistaDTO pista = mapaPistas.get(idPista);
+
+                // Si hay un material asociado, lo añadimos a la lista de materiales de la pista
+                int idMaterial = rs.getInt("idMaterial");
+                if (idMaterial != 0) {
+                    // Convertir tipo y estado a los enums correspondientes
+                    TipoMaterial tipo = TipoMaterial.valueOf(rs.getString("tipo"));
+                    EstadoMaterial estado = EstadoMaterial.valueOf(rs.getString("estado"));
+
+                    MaterialDTO material = new MaterialDTO(
+                        idMaterial,
+                        tipo,
+                        rs.getBoolean("usoExterior"),
+                        estado
+                    );
+                    pista.getMateriales().add(material);
+                }
             }
+
+            // Agregamos todas las pistas a la lista final
+            pistas.addAll(mapaPistas.values());
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return pistas;
     }
+
 
     /**
      * Método para buscar pistas disponibles según el número de jugadores y tipo de pista.
@@ -273,6 +418,7 @@ public class PistasDAO {
      */
     public List<PistaDTO> buscarPistasDisponibles(int numJugadores, TamanoPista tipoPista) throws SQLException {
         List<PistaDTO> pistasFiltradas = new ArrayList<>();
+        Map<Integer, PistaDTO> mapaPistas = new HashMap<>();
 
         // Inicializamos la conexión
         DBConnection conexion = new DBConnection();
@@ -302,16 +448,32 @@ public class PistasDAO {
             ps.setString(2, tipoPista.name());
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    PistaDTO pista = new PistaDTO(
-                        rs.getString("nombre"),
-                        rs.getBoolean("disponible"),
-                        rs.getBoolean("exterior"),
-                        TamanoPista.valueOf(rs.getString("tamanoPista")),
-                        rs.getInt("maxJugadores")
-                    );
-                    // Utiliza el nombre correcto de la columna de identificación
-                    pista.setIdPista(rs.getInt("idPista")); 
-                    pistasFiltradas.add(pista);
+                    int idPista = rs.getInt("idPista");
+                    if (!mapaPistas.containsKey(idPista)) {
+                        PistaDTO pista = new PistaDTO(
+                            rs.getString("nombre"),
+                            rs.getBoolean("disponible"),
+                            rs.getBoolean("exterior"),
+                            TamanoPista.valueOf(rs.getString("tamanoPista")),
+                            rs.getInt("maxJugadores")
+                        );
+                        pista.setIdPista(idPista);
+                        mapaPistas.put(idPista, pista);
+                    }
+
+                    // Obtener la pista correspondiente
+                    PistaDTO pista = mapaPistas.get(idPista);
+
+                    // Agregar el material si existe
+                    int idMaterial = rs.getInt("idMaterial");
+                    if (idMaterial != 0) {
+                        TipoMaterial tipo = TipoMaterial.valueOf(rs.getString("tipoMaterial"));
+                        boolean usoExterior = rs.getBoolean("usoExterior");
+                        EstadoMaterial estado = EstadoMaterial.valueOf(rs.getString("estado"));
+
+                        MaterialDTO material = new MaterialDTO(idMaterial, tipo, usoExterior, estado);
+                        pista.getMateriales().add(material);
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -319,8 +481,11 @@ public class PistasDAO {
             e.printStackTrace();
         }
 
+        // Agregar todas las pistas a la lista final
+        pistasFiltradas.addAll(mapaPistas.values());
         return pistasFiltradas;
     }
+
 
 
 
@@ -338,7 +503,13 @@ public class PistasDAO {
             return pistas;
         }
 
-        // Inicializamos la conexión si aún no está inicializada
+        // Verificar que 'prop' no sea null
+        if (this.prop == null) {
+            System.err.println("Error: Las propiedades 'prop' no están inicializadas.");
+            return pistas;
+        }
+
+        // Inicializar la conexión si es null
         if (this.con == null) {
             DBConnection conexion = new DBConnection();
             this.con = conexion.getConnection();
@@ -358,6 +529,7 @@ public class PistasDAO {
                     TamanoPista.valueOf(rs.getString("tamanoPista")),
                     rs.getInt("maxJugadores")
                 );
+                pista.setIdPista(rs.getInt("idPista")); // Asegúrate de usar el nombre correcto de la columna
                 pistas.add(pista);
             }
         } catch (SQLException e) {
@@ -369,25 +541,33 @@ public class PistasDAO {
     }
 
 
+
     /**
      * Método para buscar una pista por su ID.
      * 
      * @param idPista ID de la pista a buscar.
      * @return La pista correspondiente al ID dado, o null si no se encuentra.
      */
-    public PistaDTO buscarPistaPorId(int idPista) throws  SQLException {
-    	String sql = prop.getProperty("buscarPistaPorId");
+      private PistaDTO buscarPistaPorId(int idPista) throws SQLException {
+    	DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
+        String sql = prop.getProperty("buscarPistaPorId");
+
         try (PreparedStatement ps = con.prepareStatement(sql)) {
-        	ps.setInt(1, idPista);
-        	ResultSet rs = ps.executeQuery();
-        	
-        	if(rs.next()) {
-        		PistaDTO pista = new PistaDTO(rs.getString("nombre"), rs.getBoolean("disponible"), rs.getBoolean("exterior"), TamanoPista.valueOf(rs.getString("tamanoPista")), rs.getInt("maxJugadores"));
-        		pista.setIdPista(rs.getInt("id"));
-        		return pista;
-        	}
+            ps.setInt(1, idPista);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new PistaDTO(
+                    			rs.getInt("idPista"), rs.getString("nombre"),
+                                rs.getBoolean("disponible"), rs.getBoolean("exterior"),
+                                TamanoPista.valueOf(rs.getString("tamanoPista")),
+                                rs.getInt("maxJugadores"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return null;
     }
-}
 
+}

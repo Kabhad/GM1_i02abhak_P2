@@ -8,6 +8,7 @@ import java.util.Scanner;
 import es.uco.pw.displays.jugadores.mainJugadores;
 import es.uco.pw.displays.pistas.mainPistas;
 import es.uco.pw.displays.reservas.mainReservas;
+import es.uco.pw.data.dao.PistasDAO;
 import es.uco.pw.data.dao.ReservasDAO;
 /**
  * Clase principal que gestiona la ejecución del sistema de gestión.
@@ -40,6 +41,7 @@ public class mainPrincipal {
     public static void main(String[] args) throws IOException, ParseException, SQLException {
         Scanner sc = new Scanner(System.in);
         ReservasDAO reservasDAO = new ReservasDAO();
+        PistasDAO pistasDAO = new PistasDAO();
         
         int opcion;
         boolean continuar = true;
@@ -52,7 +54,7 @@ public class mainPrincipal {
             switch (opcion) {
                 case 1:
                     System.out.println("Accediendo al Menú de Pistas...");
-                    mainPistas.main(sc);
+                    mainPistas.main(sc, pistasDAO);
                     break;
                 case 2:
                     System.out.println("Accediendo al Menú de Reservas...");

@@ -39,8 +39,7 @@ public class mainPistas {
      * @param sc Objeto Scanner para la entrada de datos del usuario.
      * @throws SQLException 
      */
-    public static void main(Scanner sc) throws SQLException {
-        PistasDAO pistasDAO = PistasDAO.getInstance();
+    public static void main(Scanner sc, PistasDAO pistasDAO) throws SQLException {
         int opcion;
 
         do {
@@ -64,8 +63,11 @@ public class mainPistas {
                                 : tipoPista == 2 ? TamanoPista.ADULTOS : TamanoPista._3VS3;
                         System.out.print("Máximo número de jugadores: ");
                         int maxJugadores = sc.nextInt();
+                        sc.nextLine();
                         pistasDAO.crearPista(nombrePista, disponible, exterior, tamanoPista, maxJugadores);
                         System.out.println("Pista creada con éxito.");
+                    } catch (IllegalArgumentException e){
+                    	System.out.println(e.getMessage());
                     } catch (Exception e) {
                         System.out.println("Error al crear la pista: " + e.getMessage());
                     }
@@ -88,7 +90,9 @@ public class mainPistas {
                                 : estadoMaterial == 2 ? EstadoMaterial.RESERVADO : EstadoMaterial.MAL_ESTADO;
                         pistasDAO.crearMaterial(idMaterial, tipo, usoExterior, estado);
                         System.out.println("Material creado con éxito.");
-                    } catch (Exception e) {
+                    } catch (IllegalArgumentException e){
+                    	System.out.println(e.getMessage());
+                    }  catch (Exception e) {
                         System.out.println("Error al crear el material: " + e.getMessage());
                     }
                     break;

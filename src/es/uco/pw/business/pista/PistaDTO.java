@@ -12,7 +12,6 @@ import es.uco.pw.business.material.*;
  */
 public class PistaDTO {
 
-    private static int idCounter = 1; // Contador estático para generar IDs únicos
     private int idPista;
     private String nombrePista;
     private boolean disponible;
@@ -25,9 +24,29 @@ public class PistaDTO {
      * Constructor vacío que inicializa una pista con un ID único y una lista vacía de materiales.
      */
     public PistaDTO() {
-        this.idPista = idCounter++; // Asignar un ID único
+        this.materiales = new ArrayList<>(); // Inicializar la lista de materiales
+    }
+
+    
+    /**
+     * Constructor parametrizado para inicializar una pista con sus atributos.
+     *
+     * @param nombrePista Nombre de la pista.
+     * @param disponible  Estado de disponibilidad de la pista.
+     * @param exterior    Si la pista es exterior o no.
+     * @param pista       Tamaño de la pista.
+     * @param max_jugadores Número máximo de jugadores permitidos.
+     */
+    public PistaDTO(int idPista, String nombre, boolean disponible, boolean exterior, TamanoPista tamanoPista, int maxJugadores) {
+        this.idPista = idPista;
+        this.nombrePista = nombre;
+        this.disponible = disponible;
+        this.exterior = exterior;
+        this.pista = tamanoPista;
+        this.max_jugadores = maxJugadores;
         this.materiales = new ArrayList<>();
     }
+
 
     /**
      * Constructor parametrizado para inicializar una pista con sus atributos.
