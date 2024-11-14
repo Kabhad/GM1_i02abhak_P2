@@ -38,7 +38,7 @@ public class mainJugadores {
      * @param sc El objeto Scanner utilizado para leer las entradas del usuario.
      */
     public static void main(Scanner sc) {
-        JugadoresDAO gestor = JugadoresDAO.getInstance(); // Singleton
+    	JugadoresDAO gestor = new JugadoresDAO();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         int opcion;
 

@@ -2,7 +2,6 @@ package es.uco.pw.data.dao;
 
 
 import java.util.Date;
-import java.util.List;
 import java.io.*;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -22,22 +21,8 @@ import es.uco.pw.data.common.DBConnection;
  */
 public class JugadoresDAO {
     
-	private List<JugadorDTO> listaJugadores;
     private Connection con;
     private Properties prop;
-    private static JugadoresDAO instancia; // Singleton
-
-    /**
-     * Obtiene la única instancia de GestorJugadores.
-     *
-     * @return La instancia única del gestor de jugadores.
-     */
-    public static synchronized JugadoresDAO getInstance() {
-        if (instancia == null) {
-            instancia = new JugadoresDAO();
-        }
-        return instancia;
-    }
 
     /**
      * Constructor
@@ -291,35 +276,5 @@ public class JugadoresDAO {
                 e.printStackTrace();
             }
         }	
-    }
-
-    /**
-     * Busca un jugador por su correo electrónico.
-     *
-     * @param correoElectronico El correo del jugador a buscar.
-     * @return El jugador encontrado o null si no existe.
-     */
-    public JugadorDTO buscarJugadorPorCorreo(String correoElectronico) {
-        for (JugadorDTO jugadorDTO : listaJugadores) {
-            if (jugadorDTO.getCorreoElectronico().equalsIgnoreCase(correoElectronico)) {
-                return jugadorDTO;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Busca un jugador por su ID.
-     *
-     * @param idJugador El ID del jugador a buscar.
-     * @return El jugador encontrado o null si no existe.
-     */
-    public JugadorDTO buscarJugadorPorId(int idJugador) {
-        for (JugadorDTO jugadorDTO : listaJugadores) {
-            if (jugadorDTO.getIdJugador() == idJugador) {
-                return jugadorDTO;
-            }
-        }
-        return null;
     }
 }
