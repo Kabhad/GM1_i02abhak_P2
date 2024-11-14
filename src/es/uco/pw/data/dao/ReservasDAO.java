@@ -134,9 +134,9 @@ public class ReservasDAO {
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
                 if (rs.next()) {
                     int idJugador = rs.getInt("idJugador");
-                    int sesionesRestantes = rs.getInt("sesionesRestantes");
+                    int numeroSesion = rs.getInt("numeroSesion");
                     Date fechaCaducidad = rs.getDate("fechaCaducidad");
-                    bono = new Bono(idBono, idJugador, sesionesRestantes, fechaCaducidad);
+                    bono = new Bono(idBono, idJugador, numeroSesion, fechaCaducidad);
                 }
             }
         } catch (SQLException e) {
@@ -186,6 +186,17 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La cuenta del jugador no está activa.");
         }
 
+        // Validar que la reserva sea para una fecha futura con al menos 6 horas de antelación
+        Date ahora = new Date();
+        Calendar calendario = Calendar.getInstance();
+        calendario.setTime(ahora);
+        calendario.add(Calendar.HOUR, 6);
+        Date limiteMinimoReserva = calendario.getTime();
+
+        if (fechaHora.before(limiteMinimoReserva)) {
+            throw new IllegalArgumentException("La reserva debe realizarse con al menos 6 horas de antelación y no puede ser en una fecha pasada.");
+        }
+
         String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
         if (!cumpleCondicionesTipoReserva(pistaDTO, tipoReserva)) {
             throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
@@ -206,13 +217,12 @@ public class ReservasDAO {
                 0
         );
 
-        // Inserta la reserva en la base de datos
-        // Crea una instancia de ReservasDAO para llamar a insertarReserva
         ReservasDAO reservasDAO = new ReservasDAO();
-        int idReserva = reservasDAO.insertarReserva(reservaDTO); // Llama al método no estático
-        reservaDTO.setIdReserva(idReserva); // Asigna el idReserva después de la inserción
+        int idReserva = reservasDAO.insertarReserva(reservaDTO);
+        reservaDTO.setIdReserva(idReserva);
         return 1;
     }
+
 
 
     /**
@@ -233,17 +243,25 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La cuenta del jugador no está activa.");
         }
 
+        Date ahora = new Date();
+        Calendar calendario = Calendar.getInstance();
+        calendario.setTime(ahora);
+        calendario.add(Calendar.HOUR, 6);
+        Date limiteMinimoReserva = calendario.getTime();
+
+        if (fechaHora.before(limiteMinimoReserva)) {
+            throw new IllegalArgumentException("La reserva debe realizarse con al menos 6 horas de antelación y no puede ser en una fecha pasada.");
+        }
+
         String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
         if (!cumpleCondicionesTipoReserva(pistaDTO, tipoReserva)) {
             throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
         }
 
-        // Validar que el bono tenga sesiones restantes
         if (bono.getSesionesRestantes() <= 0) {
             throw new IllegalArgumentException("El bono no tiene sesiones disponibles.");
         }
 
-        // Crear el objeto de reserva
         ReservaDTO reservaDTO = ReservaGeneralFactory.crearReserva(
             tipoReserva,
             jugadorDTO.getIdJugador(),
@@ -257,13 +275,11 @@ public class ReservasDAO {
             numeroSesion
         );
 
-        // Insertar la reserva en la base de datos
         int idReserva = insertarReserva(reservaDTO);
         reservaDTO.setIdReserva(idReserva);
-
-        // Restar una sesión del bono
         actualizarSesionesBono(bono.getIdBono());
     }
+
 
 
 
@@ -379,27 +395,35 @@ public class ReservasDAO {
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
                 while (rs.next()) {
                     int idReserva = rs.getInt("idReserva");
-                    int idJugador = rs.getInt("idJugador");  // Asegúrate de que esta columna existe
+                    int idJugador = rs.getInt("idJugador");
                     int idPista = rs.getInt("idPista");
                     Date fechaHora = rs.getTimestamp("fechaHora");
                     int duracionMin = rs.getInt("duracionMin");
                     float precio = rs.getFloat("precio");
                     float descuento = rs.getFloat("descuento");
                     Integer idBono = (Integer) rs.getObject("idBono");
+                    Integer numeroSesion = null;
+                    try {
+                        numeroSesion = rs.getObject("numeroSesion") != null ? rs.getInt("numeroSesion") : null;
+                    } catch (SQLException e) {
+                        // Manejar el caso donde la columna no existe
+                        System.out.println("Advertencia: no se encontró la columna 'numeroSesion'.");
+                    }
 
                     ReservaDTO reservaDTO;
-                    if (idBono != null) {
-                        Bono bono = obtenerBono(idBono);
+                    if (idBono != null && numeroSesion != null) {
+                        // Crear instancia de Bono con el número de sesión
+                        Bono bono = new Bono(idBono, idJugador, numeroSesion, fechaHora);
                         ReservaDTO reservaEspecifica = obtenerReservaEspecifica(idReserva);
-                        
-                        // Calcular el numeroSesion basado en sesionesRestantes
-                        int numeroSesion = 5 - bono.getSesionesRestantes();
-                        
+
                         if (reservaEspecifica == null) {
                             System.out.println("Error: reserva específica no encontrada.");
                             continue;  // Saltar esta iteración si no se encuentra la reserva específica
                         }
+
+                        // Crear el objeto de reserva con bono
                         reservaDTO = new ReservaBono(idJugador, fechaHora, duracionMin, idPista, bono, numeroSesion, reservaEspecifica);
+                        
                     } else {
                         reservaDTO = new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
                     }
@@ -418,9 +442,6 @@ public class ReservasDAO {
         return reservasFuturas;
     }
 
-
-
-
     /**
      * Consulta las reservas para un día específico y una pista específica.
      *
@@ -429,9 +450,9 @@ public class ReservasDAO {
      * @return Una lista de reservas para el día y la pista especificados.
      */
 
-    public List<ReservaDTO> consultarReservasPorRangoDeFechasYPista(Date fechaInicio, Date fechaFin, int idPista) {
-        List<ReservaDTO> reservasPorRangoYPista = new ArrayList<>();
-        String sql = prop.getProperty("consultarReservasPorRangoDeFechasYPista");
+    public List<ReservaDTO> consultarReservasPorRangosDeFechaYPista(Date fechaInicio, Date fechaFin, int idPistaConsulta) {
+        List<ReservaDTO> reservasPorFecha = new ArrayList<>();
+        String sql = prop.getProperty("consultarReservasPorFecha"); // Asegúrate de que la consulta esté configurada en tu archivo de propiedades
         DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
 
@@ -454,31 +475,28 @@ public class ReservasDAO {
         Date fechaFinAjustada = calFin.getTime();
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
-
-            // Usar fechas ajustadas en la consulta
             ps.setTimestamp(1, new java.sql.Timestamp(fechaInicioAjustada.getTime()));
             ps.setTimestamp(2, new java.sql.Timestamp(fechaFinAjustada.getTime()));
-            ps.setInt(3, idPista);
 
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
                 while (rs.next()) {
                     int idReserva = rs.getInt("idReserva");
                     int idJugador = rs.getInt("idJugador");
+                    int idPista = rs.getInt("idPista");
                     Date fechaHora = rs.getTimestamp("fechaHora");
                     int duracionMin = rs.getInt("duracionMin");
                     float precio = rs.getFloat("precio");
                     float descuento = rs.getFloat("descuento");
-                    Integer idBono = rs.getObject("idBono") != null ? rs.getInt("idBono") : null; // Verifica si puede ser null
+                    Integer idBono = rs.getObject("idBono") != null ? rs.getInt("idBono") : null;
+                    Integer numeroSesion = rs.getObject("numeroSesion") != null ? rs.getInt("numeroSesion") : null;
 
                     ReservaDTO reservaDTO;
-                    
-                    // Verificar si hay un bono y calcular el numeroSesion
-                    if (idBono != null) {
-                        Bono bono = obtenerBono(idBono);
+
+                    // Si hay bono y número de sesión asociado
+                    if (idBono != null && numeroSesion != null) {
+                        // Crear instancia de Bono con el número de sesión
+                        Bono bono = new Bono(idBono, idJugador, numeroSesion, fechaHora);
                         ReservaDTO reservaEspecifica = obtenerReservaEspecifica(idReserva);
-                        
-                        // Calcular el numeroSesion basado en sesionesRestantes
-                        int numeroSesion = 5 - bono.getSesionesRestantes();  // Ajusta este cálculo según tu lógica
 
                         if (reservaEspecifica == null) {
                             System.out.println("Error: reserva específica no encontrada.");
@@ -487,26 +505,30 @@ public class ReservasDAO {
 
                         // Crear la reserva con bono
                         reservaDTO = new ReservaBono(idJugador, fechaHora, duracionMin, idPista, bono, numeroSesion, reservaEspecifica);
+
+                        // Mostrar el valor de `numeroSesion` y bono para verificación
+                        System.out.println("Reserva con bono - ID Bono: " + idBono + ", Numero de Sesion: " + numeroSesion + ", Sesiones Restantes: " + bono.getSesionesRestantes());
                     } else {
-                        // Crear la reserva individual
+                        // Si no hay bono, crear una reserva individual
                         reservaDTO = new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
                     }
 
-                    // Establecer el precio y descuento
+                    // Establecer el precio y el descuento
                     reservaDTO.setIdReserva(idReserva);
                     reservaDTO.setPrecio(precio);
                     reservaDTO.setDescuento(descuento);
 
                     // Agregar la reserva a la lista
-                    reservasPorRangoYPista.add(reservaDTO);
+                    reservasPorFecha.add(reservaDTO);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        return reservasPorRangoYPista;
+        return reservasPorFecha;
     }
+
 
 
     /**
@@ -689,10 +711,15 @@ public class ReservasDAO {
      * Lista las pistas disponibles.
      *
      * @return Una lista de pistas disponibles.
-     * @throws SQLException 
      */
-    public List<PistaDTO> listarPistasDisponibles() throws SQLException {
-        return PistasDAO.getInstance().buscarPistasDisponibles();
+    public List<PistaDTO> listarPistasDisponibles() {
+        PistasDAO pistasDAO = new PistasDAO(); // Instanciación de PistasDAO
+        try {
+            return pistasDAO.buscarPistasDisponibles(); // Llamada al método en PistasDAO
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<>(); // Retorna una lista vacía en caso de excepción
+        }
     }
 
     /**
@@ -700,10 +727,15 @@ public class ReservasDAO {
      *
      * @param idPista El ID de la pista a buscar.
      * @return La pista encontrada, o null si no se encuentra.
-     * @throws SQLException 
      */
-    public static PistaDTO buscarPistaPorId(int idPista) throws SQLException {
-        return PistasDAO.getInstance().buscarPistaPorId(idPista);
+    public PistaDTO buscarPistaPorId(int idPista) {
+        try {
+            PistasDAO pistasDAO = new PistasDAO(); // Instanciación directa de PistasDAO
+            return pistasDAO.buscarPistaPorId(idPista); // Llamada al método no estático
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**

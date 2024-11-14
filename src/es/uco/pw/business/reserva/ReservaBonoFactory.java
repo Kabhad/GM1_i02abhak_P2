@@ -37,8 +37,18 @@ public class ReservaBonoFactory extends ReservaFactory {
      */
     @Override
     public ReservaDTO crearReservaBono(String tipoUsuario, int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroAdultos, int numeroNinos, Bono bono, int numeroSesion) {
-        ReservaDTO reservaEspecifica;
+        // Validar si el bono está caducado
+        if (bono.estaCaducado()) {
+            throw new IllegalArgumentException("El bono ha caducado y no puede ser utilizado para esta reserva.");
+        }
 
+        // Validar si hay sesiones restantes
+        if (bono.getSesionesRestantes() <= 0) {
+            throw new IllegalStateException("El bono no tiene sesiones restantes disponibles.");
+        }
+
+        // Crear la reserva específica según el tipo de usuario
+        ReservaDTO reservaEspecifica;
         switch (tipoUsuario.toLowerCase()) {
             case "infantil":
                 reservaEspecifica = new ReservaInfantil(idUsuario, fechaHora, duracionMinutos, idPista, numeroNinos);
@@ -52,10 +62,17 @@ public class ReservaBonoFactory extends ReservaFactory {
             default:
                 throw new IllegalArgumentException("Tipo de usuario no válido: " + tipoUsuario);
         }
-        
-        reservaEspecifica.setDescuento(0.05f);  // Sincroniza el descuento en la reserva específica
+
+        // Aplicar descuento en la reserva específica
+        reservaEspecifica.setDescuento(0.05f);
 
         // Crear la reserva de bono con la reserva específica
-        return new ReservaBono(idUsuario, fechaHora, duracionMinutos, idPista, bono, numeroSesion, reservaEspecifica);
+        ReservaBono reservaBono = new ReservaBono(idUsuario, fechaHora, duracionMinutos, idPista, bono, numeroSesion, reservaEspecifica);
+
+        // Consumir una sesión del bono
+        bono.consumirSesion(); // Disminuir las sesiones restantes
+
+        return reservaBono;
     }
+
 }

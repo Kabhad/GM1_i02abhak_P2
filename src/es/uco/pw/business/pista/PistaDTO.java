@@ -31,11 +31,13 @@ public class PistaDTO {
     /**
      * Constructor parametrizado para inicializar una pista con sus atributos.
      *
+     * @param idPista ID de la pista.
      * @param nombrePista Nombre de la pista.
      * @param disponible  Estado de disponibilidad de la pista.
      * @param exterior    Si la pista es exterior o no.
      * @param pista       Tamaño de la pista.
      * @param max_jugadores Número máximo de jugadores permitidos.
+     * @param materiales Lista de materiales
      */
     public PistaDTO(int idPista, String nombre, boolean disponible, boolean exterior, TamanoPista tamanoPista, int maxJugadores) {
         this.idPista = idPista;
@@ -44,7 +46,7 @@ public class PistaDTO {
         this.exterior = exterior;
         this.pista = tamanoPista;
         this.max_jugadores = maxJugadores;
-        this.materiales = new ArrayList<>();
+        this.materiales = crearListaMateriales();
     }
 
 
@@ -214,13 +216,30 @@ public class PistaDTO {
      * @return Lista de materiales disponibles.
      */
     public List<MaterialDTO> consultarMaterialesDisponibles() {
-        List<MaterialDTO> materialesDisponibles = new ArrayList<>();
+        List<MaterialDTO> materialesDisponibles = crearListaMateriales(); // Usar el método de fábrica
         for (MaterialDTO materialDTO : materiales) {
             if (materialDTO.getEstado() == EstadoMaterial.DISPONIBLE) {
                 materialesDisponibles.add(materialDTO);
             }
         }
         return materialesDisponibles;
+    }
+    
+    // Excepciones internas para manejar los errores específicos del método asociarMaterialAPista
+    public static class MaterialIncompatibleException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public MaterialIncompatibleException(String message) {
+            super(message);
+        }
+    }
+
+    public static class MaximoMaterialException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public MaximoMaterialException(String message) {
+            super(message);
+        }
     }
 
     /**
@@ -229,10 +248,9 @@ public class PistaDTO {
      * @param materialDTO Material a asociar a la pista.
      * @return True si el material fue añadido exitosamente, False en caso contrario.
      */
-    public boolean asociarMaterialAPista(MaterialDTO materialDTO) {
+    public boolean asociarMaterialAPista(MaterialDTO materialDTO) throws MaterialIncompatibleException, MaximoMaterialException {
         if (this.exterior && !materialDTO.isUsoExterior()) {
-            System.out.println("El material no puede ser utilizado en una pista exterior.");
-            return false;
+            throw new MaterialIncompatibleException("El material no puede ser utilizado en una pista exterior.");
         }
 
         int cantidadPelotas = 0;
@@ -256,20 +274,21 @@ public class PistaDTO {
         }
 
         if (materialDTO.getTipo() == TipoMaterial.PELOTAS && cantidadPelotas >= 12) {
-            System.out.println("No se pueden añadir más de 12 pelotas a la pista.");
-            return false;
+            throw new MaximoMaterialException("No se pueden añadir más de 12 pelotas a la pista.");
         }
         if (materialDTO.getTipo() == TipoMaterial.CANASTAS && cantidadCanastas >= 2) {
-            System.out.println("No se pueden añadir más de 2 canastas a la pista.");
-            return false;
+            throw new MaximoMaterialException("No se pueden añadir más de 2 canastas a la pista.");
         }
         if (materialDTO.getTipo() == TipoMaterial.CONOS && cantidadConos >= 20) {
-            System.out.println("No se pueden añadir más de 20 conos a la pista.");
-            return false;
+            throw new MaximoMaterialException("No se pueden añadir más de 20 conos a la pista.");
         }
 
         materiales.add(materialDTO);
         return true; // Material añadido exitosamente
+    }
+    
+    private List<MaterialDTO> crearListaMateriales() {
+        return new ArrayList<>(); // Aquí puedes cambiar fácilmente la implementación
     }
 }
 

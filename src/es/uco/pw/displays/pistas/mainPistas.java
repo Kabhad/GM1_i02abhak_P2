@@ -8,6 +8,8 @@ import es.uco.pw.business.material.*;
 import es.uco.pw.business.pista.PistaDTO;
 import es.uco.pw.business.pista.TamanoPista;
 import es.uco.pw.data.dao.PistasDAO;
+import es.uco.pw.data.dao.PistasDAO.AsociacionMaterialException;
+import es.uco.pw.data.dao.PistasDAO.ElementoNoEncontradoException;
 
 /**
  * Clase que representa el menú principal de gestión de pistas deportivas.
@@ -104,14 +106,15 @@ public class mainPistas {
                         String nombreAsociarPista = sc.nextLine();
                         System.out.print("ID del material a asociar: ");
                         int idMaterialAsociar = sc.nextInt();
+                        
                         boolean resultado = pistasDAO.asociarMaterialAPista(nombreAsociarPista, idMaterialAsociar);
                         if (resultado) {
                             System.out.println("Material asociado con éxito.");
-                        } else {
-                            System.out.println("No se pudo asociar el material.");
                         }
-                    } catch (IllegalArgumentException e) {
+                    } catch (ElementoNoEncontradoException | AsociacionMaterialException e) {
                         System.out.println("Error: " + e.getMessage());
+                    } catch (SQLException e) {
+                        System.out.println("Error en la base de datos: " + e.getMessage());
                     }
                     break;
 
