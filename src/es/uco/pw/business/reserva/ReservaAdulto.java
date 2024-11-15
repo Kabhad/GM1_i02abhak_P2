@@ -58,8 +58,10 @@ public class ReservaAdulto extends ReservaDTO {
      */
     @Override
     public String toString() {
-        return super.toString() + ", numeroAdultos=" + numeroAdultos + "]";
+        return "  Tipo de Reserva: Adulto\n" +
+               "  Número de Adultos: " + numeroAdultos;
     }
+
 
     /**
      * Retorna una representación específica del número de adultos en la reserva.

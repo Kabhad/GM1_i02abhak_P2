@@ -57,7 +57,8 @@ public class ReservaInfantil extends ReservaDTO {
      */
     @Override
     public String toString() {
-        return super.toString() + ", numeroNinos=" + numeroNinos + "]";
+        return "  Tipo de Reserva: Infantil\n" +
+               "  Número de Niños: " + numeroNinos;
     }
 
     /**

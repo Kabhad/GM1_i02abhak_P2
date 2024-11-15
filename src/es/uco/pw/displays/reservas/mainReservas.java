@@ -64,9 +64,14 @@ public class mainReservas {
                         break;
                     }
 
-                    List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles();
+                    // Solicitar el tipo de reserva
+                    System.out.print("Ingrese el tipo de reserva (infantil, familiar, adulto): ");
+                    String tipoReserva = sc.nextLine().toLowerCase();
+
+                    // Listar pistas disponibles basadas en el tipo de reserva
+                    List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles(tipoReserva);
                     if (pistasDisponibles.isEmpty()) {
-                        System.out.println("No hay pistas disponibles.");
+                        System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReserva + "'.");
                         break;
                     }
 
@@ -91,13 +96,20 @@ public class mainReservas {
                     int duracionMinutos = sc.nextInt();
                     sc.nextLine(); // Limpiar buffer
 
-                    System.out.print("Ingrese número de adultos: ");
-                    int numeroAdultos = sc.nextInt();
-                    sc.nextLine(); // Limpiar buffer
+                    int numeroAdultos = 0;
+                    int numeroNinos = 0;
 
-                    System.out.print("Ingrese número de niños: ");
-                    int numeroNinos = sc.nextInt();
-                    sc.nextLine(); // Limpiar buffer
+                    // Solicitar número de adultos y/o niños según el tipo de reserva
+                    if (tipoReserva.equals("familiar") || tipoReserva.equals("adulto")) {
+                        System.out.print("Ingrese número de adultos: ");
+                        numeroAdultos = sc.nextInt();
+                        sc.nextLine(); // Limpiar buffer
+                    }
+                    if (tipoReserva.equals("familiar") || tipoReserva.equals("infantil")) {
+                        System.out.print("Ingrese número de niños: ");
+                        numeroNinos = sc.nextInt();
+                        sc.nextLine(); // Limpiar buffer
+                    }
 
                     try {
                         int idReserva = reservasDAO.hacerReservaIndividual(jugadorDTO, fechaHora, duracionMinutos, pistaDTO, numeroAdultos, numeroNinos);
@@ -121,13 +133,16 @@ public class mainReservas {
                         break;
                     }
 
-                    List<PistaDTO> pistasDisponiblesBono = reservasDAO.listarPistasDisponibles();
+                    System.out.print("Ingrese el tipo de reserva (infantil, familiar, adulto): ");
+                    String tipoReservaBono = sc.nextLine().toLowerCase();
+
+                    List<PistaDTO> pistasDisponiblesBono = reservasDAO.listarPistasDisponibles(tipoReservaBono);
                     if (pistasDisponiblesBono.isEmpty()) {
-                        System.out.println("No hay pistas disponibles.");
+                        System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReservaBono + "'.");
                         break;
                     }
 
-                    System.out.println("Pistas disponibles:");
+                    System.out.println("Pistas disponibles para reservar con bono:");
                     for (PistaDTO pistaDTO : pistasDisponiblesBono) {
                         System.out.println("ID: " + pistaDTO.getIdPista() + ", Nombre: " + pistaDTO.getNombrePista() + ", Máx. Jugadores: " + pistaDTO.getMax_jugadores());
                     }
@@ -148,13 +163,19 @@ public class mainReservas {
                     int duracionMinutosBono = sc.nextInt();
                     sc.nextLine(); // Limpiar buffer
 
-                    System.out.print("Ingrese número de adultos: ");
-                    int numeroAdultosBono = sc.nextInt();
-                    sc.nextLine(); // Limpiar buffer
+                    int numeroAdultosBono = 0;
+                    int numeroNinosBono = 0;
 
-                    System.out.print("Ingrese número de niños: ");
-                    int numeroNinosBono = sc.nextInt();
-                    sc.nextLine(); // Limpiar buffer
+                    if (tipoReservaBono.equals("familiar") || tipoReservaBono.equals("adulto")) {
+                        System.out.print("Ingrese número de adultos: ");
+                        numeroAdultosBono = sc.nextInt();
+                        sc.nextLine(); // Limpiar buffer
+                    }
+                    if (tipoReservaBono.equals("familiar") || tipoReservaBono.equals("infantil")) {
+                        System.out.print("Ingrese número de niños: ");
+                        numeroNinosBono = sc.nextInt();
+                        sc.nextLine(); // Limpiar buffer
+                    }
 
                     System.out.print("Ingrese ID del bono: ");
                     int idBono = sc.nextInt();
@@ -162,8 +183,15 @@ public class mainReservas {
 
                     Bono bono = reservasDAO.obtenerBono(idBono);
                     if (bono == null) {
-                        System.out.println("Bono no encontrado.");
-                        break;
+                        System.out.println("Bono no encontrado. ¿Desea crear un nuevo bono? (S/N)");
+                        String respuesta = sc.nextLine();
+                        if (respuesta.equalsIgnoreCase("S")) {
+                            bono = reservasDAO.crearNuevoBono(jugadorBono.getIdJugador());  // Implementar `crearNuevoBono` en `ReservasDAO`
+                            System.out.println("Nuevo bono creado con ID: " + bono.getIdBono());
+                        } else {
+                            System.out.println("Operación cancelada.");
+                            return;
+                        }
                     }
 
                     if (bono.getSesionesRestantes() <= 0) {
@@ -171,20 +199,19 @@ public class mainReservas {
                         break;
                     }
 
-                    System.out.print("Ingrese número de la sesión del bono (1 a 5): ");
-                    int numeroSesion = sc.nextInt();
-                    sc.nextLine(); // Limpiar buffer
+                    int numeroSesion = 5 - bono.getSesionesRestantes();
 
                     try {
                         reservasDAO.hacerReservaBono(jugadorBono, fechaHoraBono, duracionMinutosBono, pistaBono, numeroAdultosBono, numeroNinosBono, bono, numeroSesion);
                         System.out.println("Reserva de bono creada correctamente.");
                     } catch (IllegalArgumentException e) {
-                        System.out.println("Error al crear la reserva de bono: " + e.getMessage()); // Captura y muestra los errores de fecha
+                        System.out.println("Error al crear la reserva de bono: " + e.getMessage());
                     }
                 } catch (ParseException e) {
                     System.out.println("Formato de fecha incorrecto.");
                 }
                 break;
+
 
                 
                 case 3:
@@ -279,8 +306,6 @@ public class mainReservas {
                 	}
                 	break;
 
-
-
                 case 4:
                     // Cancelar una reserva
                     System.out.println("Iniciando proceso para cancelar una reserva...");
@@ -300,8 +325,16 @@ public class mainReservas {
                         System.out.print("Ingrese fecha y hora de la reserva (yyyy-MM-dd HH:mm): ");
                         Date fechaHoraCancelacion = dateFormat.parse(sc.nextLine());
 
+                        // Obtener la pista directamente usando el método buscarPistaPorId
+                        PistaDTO pistaCancelacion = reservasDAO.buscarPistaPorId(idPistaCancelacion);
+                        if (pistaCancelacion == null) {
+                            System.out.println("Pista no encontrada.");
+                            break;
+                        }
+
                         try {
-                            reservasDAO.cancelarReserva(jugadorCancelacion, reservasDAO.listarPistasDisponibles().stream().filter(p -> p.getIdPista() == idPistaCancelacion).findFirst().orElse(null), fechaHoraCancelacion);
+                            // Cancelar la reserva usando los detalles del jugador, pista y fecha/hora de la reserva
+                        	reservasDAO.cancelarReserva(jugadorCancelacion, pistaCancelacion, fechaHoraCancelacion);
                             System.out.println("Reserva cancelada exitosamente.");
                         } catch (IllegalArgumentException e) {
                             System.out.println("Error al cancelar la reserva: " + e.getMessage());
@@ -318,170 +351,47 @@ public class mainReservas {
                     if (reservasFuturas.isEmpty()) {
                         System.out.println("No hay reservas futuras.");
                     } else {
-                        for (ReservaDTO reservaDTO : reservasFuturas) {
-                            System.out.println("Número de Reserva: " + reservaDTO.getIdReserva());
-                            
-                            if (reservaDTO instanceof ReservaBono) {
-                                ReservaBono reservaBono = (ReservaBono) reservaDTO;
-                                System.out.println("Reserva de Bono:");
-                                System.out.println("  ID Usuario: " + reservaBono.getIdUsuario());
-                                System.out.println("  Fecha y Hora: " + reservaBono.getFechaHora());
-                                System.out.println("  Pista: " + reservaBono.getIdPista());
-                                System.out.println("  Duración: " + reservaBono.getDuracionMinutos() + " minutos");
-                                System.out.println("  Bono ID: " + reservaBono.getIdBono());
-                                System.out.println("  Sesión número: " + reservaBono.getNumeroSesion());
-                                System.out.println("  Sesiones restantes: " + reservaBono.getBono().getSesionesRestantes());
-                                System.out.println("  Descuento aplicado en Bono: " + (reservaBono.getDescuento() * 100) + "%");
+                    	for (ReservaDTO reserva : reservasFuturas) {
+                    	    System.out.println("Número de Reserva: " + reserva.getIdReserva());
+                    	    System.out.println(reserva.toString());
+                    	    System.out.println("------------------------------------");
+                    	}
+                    }
+                    break;
 
-                                ReservaDTO reservaEspecifica = reservaBono.getReservaEspecifica();
-                                if (reservaEspecifica != null) {
-                                    System.out.println("  Tipo de Reserva Específica: " + reservaEspecifica.getClass().getSimpleName());
-                                    if (reservaEspecifica instanceof ReservaFamiliar) {
-                                        System.out.println("    Número de Adultos: " + ((ReservaFamiliar) reservaEspecifica).getNumeroAdultos());
-                                        System.out.println("    Número de Niños: " + ((ReservaFamiliar) reservaEspecifica).getNumeroNinos());
-                                    } else if (reservaEspecifica instanceof ReservaAdulto) {
-                                        System.out.println("    Número de Adultos: " + ((ReservaAdulto) reservaEspecifica).getNumeroAdultos());
-                                    } else if (reservaEspecifica instanceof ReservaInfantil) {
-                                        System.out.println("    Número de Niños: " + ((ReservaInfantil) reservaEspecifica).getNumeroNinos());
-                                    }
-                                    System.out.println("    Precio Específico: " + reservaEspecifica.getPrecio());
-                                    System.out.println("    Descuento aplicado: " + (reservaEspecifica.getDescuento() * 100) + "%");
-                                }
+                    
+                case 6:
+                    System.out.println("Consultando reservas por rango de fechas y pista...");
+                    try {
+                        SimpleDateFormat formatoFecha = new SimpleDateFormat("yyyy-MM-dd");
 
-                                System.out.println("  Precio Total (con descuento): " + reservaBono.getPrecio());
-                                System.out.println("------------------------------------");
+                        System.out.print("Ingrese la fecha de inicio (yyyy-MM-dd): ");
+                        Date fechaInicio = formatoFecha.parse(sc.nextLine());
 
-                            } else if (reservaDTO instanceof ReservaIndividual) {
-                                ReservaIndividual reservaIndividual = (ReservaIndividual) reservaDTO;
-                                System.out.println("Reserva Individual:");
-                                System.out.println("  ID Usuario: " + reservaIndividual.getIdUsuario());
-                                System.out.println("  Fecha y Hora: " + reservaIndividual.getFechaHora());
-                                System.out.println("  Pista: " + reservaIndividual.getIdPista());
-                                System.out.println("  Duración: " + reservaIndividual.getDuracionMinutos() + " minutos");
-                                System.out.println("  Descuento aplicado en Individual: " + (reservaIndividual.getDescuento() * 100) + "%");
+                        System.out.print("Ingrese la fecha de fin (yyyy-MM-dd): ");
+                        Date fechaFin = formatoFecha.parse(sc.nextLine());
 
-                                ReservaDTO reservaEspecifica = reservaIndividual.getReservaEspecifica();
-                                if (reservaEspecifica != null) {
-                                    System.out.println("  Tipo de Reserva Específica: " + reservaEspecifica.getClass().getSimpleName());
-                                    if (reservaEspecifica instanceof ReservaFamiliar) {
-                                        System.out.println("    Número de Adultos: " + ((ReservaFamiliar) reservaEspecifica).getNumeroAdultos());
-                                        System.out.println("    Número de Niños: " + ((ReservaFamiliar) reservaEspecifica).getNumeroNinos());
-                                    } else if (reservaEspecifica instanceof ReservaAdulto) {
-                                        System.out.println("    Número de Adultos: " + ((ReservaAdulto) reservaEspecifica).getNumeroAdultos());
-                                    } else if (reservaEspecifica instanceof ReservaInfantil) {
-                                        System.out.println("    Número de Niños: " + ((ReservaInfantil) reservaEspecifica).getNumeroNinos());
-                                    }
-                                    System.out.println("    Precio Específico: " + reservaEspecifica.getPrecio());
-                                    System.out.println("    Descuento aplicado: " + (reservaEspecifica.getDescuento() * 100) + "%");
-                                }
+                        System.out.print("Ingrese ID de la pista: ");
+                        int idPistaConsulta = sc.nextInt();
+                        sc.nextLine();
 
-                                System.out.println("  Precio Total (con descuento): " + reservaIndividual.getPrecio());
+                        List<ReservaDTO> reservasPorRangoDeFechasYPista = reservasDAO.consultarReservasPorRangosDeFechaYPista(fechaInicio, fechaFin, idPistaConsulta);
+
+                        if (reservasPorRangoDeFechasYPista.isEmpty()) {
+                            System.out.println("No hay reservas para ese rango de fechas y pista.");
+                        } else {
+                            System.out.println("------------------------------------");
+                            for (ReservaDTO reservaDTO : reservasPorRangoDeFechasYPista) {
+                                System.out.println(reservaDTO.toString());
                                 System.out.println("------------------------------------");
                             }
                         }
+                    } catch (Exception e) {
+                        System.out.println("Error al consultar reservas: " + e.getMessage());
+                        e.printStackTrace();
                     }
                     break;
-                    
-	                case 6:
-	                    // Consultar reservas por rango de fechas y pista
-	                    System.out.println("Consultando reservas por rango de fechas y pista...");
-	                    try {
-	                        // Formato para la fecha
-	                        SimpleDateFormat formatoFecha = new SimpleDateFormat("yyyy-MM-dd");
-	
-	                        // Solicitar fecha de inicio
-	                        System.out.print("Ingrese la fecha de inicio (yyyy-MM-dd): ");
-	                        Date fechaInicio = formatoFecha.parse(sc.nextLine()); // Se obtiene la fecha de inicio
-	
-	                        // Solicitar fecha de fin
-	                        System.out.print("Ingrese la fecha de fin (yyyy-MM-dd): ");
-	                        Date fechaFin = formatoFecha.parse(sc.nextLine()); // Se obtiene la fecha de fin
-	
-	                        // Solicitar ID de la pista
-	                        System.out.print("Ingrese ID de la pista: ");
-	                        int idPistaConsulta = sc.nextInt();
-	                        sc.nextLine(); // Limpiar el buffer
-	
-	                        // Consultar reservas para ese rango de fechas y pista desde la base de datos
-	                        List<ReservaDTO> reservasPorRangoDeFechasYPista = reservasDAO.consultarReservasPorRangosDeFechaYPista(fechaInicio, fechaFin, idPistaConsulta);
-	
-	                        if (reservasPorRangoDeFechasYPista.isEmpty()) {
-	                            System.out.println("No hay reservas para ese rango de fechas y pista.");
-	                        } else {
-                                System.out.println("------------------------------------");
-	                            // Iterar por las reservas obtenidas
-	                            for (ReservaDTO reservaDTO : reservasPorRangoDeFechasYPista) {;
-	                                System.out.println("Número de Reserva: " + reservaDTO.getIdReserva());
-	
-	                                // Comprobar el tipo de reserva y mostrar información específica
-	                                if (reservaDTO instanceof ReservaBono) {
-	                                    ReservaBono reservaBono = (ReservaBono) reservaDTO;
-	                                    System.out.println("Reserva de Bono:");
-	                                    System.out.println("  ID Usuario: " + reservaBono.getIdUsuario());
-	                                    System.out.println("  Fecha y Hora: " + reservaBono.getFechaHora());
-	                                    System.out.println("  Pista: " + reservaBono.getIdPista());
-	                                    System.out.println("  Duración: " + reservaBono.getDuracionMinutos() + " minutos");
-	                                    System.out.println("  Bono ID: " + reservaBono.getIdBono());
-	                                    System.out.println("  Sesión número: " + reservaBono.getNumeroSesion());
-	                                    System.out.println("  Sesiones restantes: " + reservaBono.getBono().getSesionesRestantes());
-	                                    System.out.println("  Descuento aplicado en Bono: " + (reservaBono.getDescuento() * 100) + "%");
-	
-	                                    // Mostrar detalles adicionales si existen
-	                                    ReservaDTO reservaEspecifica = reservaBono.getReservaEspecifica();
-	                                    if (reservaEspecifica != null) {
-	                                        System.out.println("  Tipo de Reserva Específica: " + reservaEspecifica.getClass().getSimpleName());
-	                                        if (reservaEspecifica instanceof ReservaFamiliar) {
-	                                            ReservaFamiliar reservaFamiliar = (ReservaFamiliar) reservaEspecifica;
-	                                            System.out.println("    Número de Adultos: " + reservaFamiliar.getNumeroAdultos());
-	                                            System.out.println("    Número de Niños: " + reservaFamiliar.getNumeroNinos());
-	                                        } else if (reservaEspecifica instanceof ReservaAdulto) {
-	                                            System.out.println("    Número de Adultos: " + ((ReservaAdulto) reservaEspecifica).getNumeroAdultos());
-	                                        } else if (reservaEspecifica instanceof ReservaInfantil) {
-	                                            System.out.println("    Número de Niños: " + ((ReservaInfantil) reservaEspecifica).getNumeroNinos());
-	                                        }
-	                                        System.out.println("    Precio Específico: " + reservaEspecifica.getPrecio());
-	                                        System.out.println("    Descuento aplicado: " + (reservaEspecifica.getDescuento() * 100) + "%");
-	                                    }
-	
-	                                    System.out.println("  Precio Total (con descuento): " + reservaBono.getPrecio());
-	                                    System.out.println("------------------------------------");
-	
-	                                } else if (reservaDTO instanceof ReservaIndividual) {
-	                                    ReservaIndividual reservaIndividual = (ReservaIndividual) reservaDTO;
-	                                    System.out.println("Reserva Individual:");
-	                                    System.out.println("  ID Usuario: " + reservaIndividual.getIdUsuario());
-	                                    System.out.println("  Fecha y Hora: " + reservaIndividual.getFechaHora());
-	                                    System.out.println("  Pista: " + reservaIndividual.getIdPista());
-	                                    System.out.println("  Duración: " + reservaIndividual.getDuracionMinutos() + " minutos");
-	                                    System.out.println("  Descuento aplicado en Individual: " + (reservaIndividual.getDescuento() * 100) + "%");
-	
-	                                    // Mostrar detalles adicionales si existen
-	                                    ReservaDTO reservaEspecifica = reservaIndividual.getReservaEspecifica();
-	                                    if (reservaEspecifica != null) {
-	                                        System.out.println("  Tipo de Reserva Específica: " + reservaEspecifica.getClass().getSimpleName());
-	                                        if (reservaEspecifica instanceof ReservaFamiliar) {
-	                                            ReservaFamiliar reservaFamiliar = (ReservaFamiliar) reservaEspecifica;
-	                                            System.out.println("    Número de Adultos: " + reservaFamiliar.getNumeroAdultos());
-	                                            System.out.println("    Número de Niños: " + reservaFamiliar.getNumeroNinos());
-	                                        } else if (reservaEspecifica instanceof ReservaAdulto) {
-	                                            System.out.println("    Número de Adultos: " + ((ReservaAdulto) reservaEspecifica).getNumeroAdultos());
-	                                        } else if (reservaEspecifica instanceof ReservaInfantil) {
-	                                            System.out.println("    Número de Niños: " + ((ReservaInfantil) reservaEspecifica).getNumeroNinos());
-	                                        }
-	                                        System.out.println("    Precio Específico: " + reservaEspecifica.getPrecio());
-	                                        System.out.println("    Descuento aplicado: " + (reservaEspecifica.getDescuento() * 100) + "%");
-	                                    }
-	
-	                                    System.out.println("  Precio Total (con descuento): " + reservaIndividual.getPrecio());
-	                                    System.out.println("------------------------------------");
-	                                }
-	                            }
-	                        }
-	                    } catch (Exception e) {
-	                        System.out.println("Error al consultar reservas: " + e.getMessage());
-	                        e.printStackTrace();
-	                    }
-	                    break;
+
 
 
 

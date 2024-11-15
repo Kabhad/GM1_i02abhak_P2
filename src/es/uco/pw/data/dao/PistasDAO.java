@@ -404,7 +404,6 @@ public class PistasDAO {
     public List<PistaDTO> buscarPistasDisponibles(int numJugadores, TamanoPista tipoPista) throws SQLException {
         List<PistaDTO> pistasFiltradas = new ArrayList<>();
         Map<Integer, PistaDTO> mapaPistas = new HashMap<>();
-
         // Inicializamos la conexión
         DBConnection conexion = new DBConnection();
         this.con = conexion.getConnection();
@@ -470,6 +469,87 @@ public class PistasDAO {
         pistasFiltradas.addAll(mapaPistas.values());
         return pistasFiltradas;
     }
+    
+    public List<PistaDTO> listarPistasDisponibles(String tipoReserva) throws SQLException {
+        List<PistaDTO> pistasFiltradas = new ArrayList<>();
+        Map<Integer, PistaDTO> mapaPistas = new HashMap<>();
+        
+        // Configuración de tipo de pista según el tipo de reserva
+        String tipoPista;
+        switch (tipoReserva.toLowerCase()) {
+            case "infantil":
+                tipoPista = "MINIBASKET";
+                break;
+            case "familiar":
+                tipoPista = "MINIBASKET'; OR tamanoPista = '3VS3";
+                break;
+            case "adulto":
+                tipoPista = "ADULTOS";
+                break;
+            default:
+                throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
+        }
+
+        // Inicializamos la conexión
+        DBConnection conexion = new DBConnection();
+        this.con = conexion.getConnection();
+
+        // Verificamos que la conexión y 'prop' no sean null
+        if (this.con == null || this.prop == null) {
+            System.err.println("Error: No se pudo obtener la conexión o las propiedades 'prop' no están inicializadas.");
+            return pistasFiltradas;
+        }
+
+        // Obtenemos la consulta SQL y verificamos que no esté vacía
+        String sql = this.prop.getProperty("buscarPistasDisponiblesPorTipo");
+        if (sql == null || sql.isEmpty()) {
+            System.err.println("Error: La consulta SQL para 'buscarPistasDisponibles' no está definida o está vacía.");
+            return pistasFiltradas;
+        }
+
+        try (PreparedStatement ps = this.con.prepareStatement(sql)) {
+            ps.setString(1, tipoPista);  // Filtro por tipo de pista en función de tipoReserva
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int idPista = rs.getInt("idPista");
+                    if (!mapaPistas.containsKey(idPista)) {
+                        PistaDTO pista = new PistaDTO(
+                            rs.getString("nombre"),
+                            rs.getBoolean("disponible"),
+                            rs.getBoolean("exterior"),
+                            TamanoPista.valueOf(rs.getString("tamanoPista")),
+                            rs.getInt("maxJugadores")
+                        );
+                        pista.setIdPista(idPista);
+                        mapaPistas.put(idPista, pista);
+                    }
+
+                    // Obtener la pista correspondiente
+                    PistaDTO pista = mapaPistas.get(idPista);
+
+                    // Agregar el material si existe
+                    int idMaterial = rs.getInt("idMaterial");
+                    if (idMaterial != 0) {
+                        TipoMaterial tipo = TipoMaterial.valueOf(rs.getString("tipoMaterial"));
+                        boolean usoExterior = rs.getBoolean("usoExterior");
+                        EstadoMaterial estado = EstadoMaterial.valueOf(rs.getString("estado"));
+
+                        MaterialDTO material = new MaterialDTO(idMaterial, tipo, usoExterior, estado);
+                        pista.getMateriales().add(material);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al ejecutar la consulta de pistas disponibles.");
+            e.printStackTrace();
+        }
+
+        // Agregar todas las pistas a la lista final
+        pistasFiltradas.addAll(mapaPistas.values());
+        return pistasFiltradas;
+    }
+
 
     /**
      * Método para listar todas las pistas con sus detalles.

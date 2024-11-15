@@ -40,7 +40,7 @@ public class Bono {
      * @param fechaPrimeraReserva La fecha de la primera reserva.
      * @return La fecha de caducidad del bono.
      */
-    private Date calcularFechaCaducidad(Date fechaPrimeraReserva) {
+    public Date calcularFechaCaducidad(Date fechaPrimeraReserva) {
         // Lógica para calcular la fecha de caducidad a partir de la primera reserva (un año)
         Calendar cal = Calendar.getInstance();
         cal.setTime(fechaPrimeraReserva);
@@ -152,7 +152,10 @@ public class Bono {
      */
     @Override
     public String toString() {
-        return "Bono [idBono=" + idBono + ", idUsuario=" + idUsuario + ", sesionesRestantes=" + sesionesRestantes
-                + ", fechaCaducidad=" + fechaCaducidad + "]";
+        return "[ID Bono: " + idBono +
+               ", ID Usuario: " + idUsuario +
+               ", Sesiones Restantes: " + sesionesRestantes +
+               ", Fecha de Caducidad: " + fechaCaducidad + "]";
     }
+
 }

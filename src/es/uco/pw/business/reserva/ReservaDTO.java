@@ -15,6 +15,7 @@ public abstract class ReservaDTO {
     private int idPista;
     private float precio;
     private float descuento;
+    protected ReservaDTO reservaEspecifica; // Agregar reserva específica como un campo opcional
 
     /** 
      * Constructor vacío.
@@ -35,10 +36,10 @@ public abstract class ReservaDTO {
         this.fechaHora = fechaHora;
         this.duracionMinutos = duracionMinutos;
         this.idPista = idPista;
-        this.precio = calcularPrecio(duracionMinutos, 0); // Calcula el precio automáticamente sin descuento inicialmente
-        this.descuento = 0; // El descuento se aplicará después si es necesario
+        this.precio = calcularPrecio(duracionMinutos, 0);
+        this.descuento = 0;
     }
-    
+
     /**
      * Cálculo de precios basado en la duración, aplicando el descuento si existe.
      * 
@@ -160,7 +161,17 @@ public abstract class ReservaDTO {
         return descuento;
     }
     
-    public int getIdReserva() {
+    
+/**
+ * Establece el porcentaje de descuento aplicado a la reserva y recalcula el precio.
+ * 
+ * @param descuento El nuevo porcentaje de descuento.
+ */    
+    public void setDescuento(float descuento) {
+		this.descuento = descuento;
+	}
+
+	public int getIdReserva() {
         return idReserva;
     }
 
@@ -169,24 +180,41 @@ public abstract class ReservaDTO {
     }
 
 
-    /**
-     * Establece el porcentaje de descuento aplicado a la reserva y recalcula el precio.
-     * 
-     * @param descuento El nuevo porcentaje de descuento.
-     */
-    public void setDescuento(float descuento) {
-        this.descuento = descuento;
-        this.precio = calcularPrecio(this.duracionMinutos, descuento); // Recalcular el precio al aplicar descuento
+
+    public ReservaDTO getReservaEspecifica() {
+		return reservaEspecifica;
+	}
+
+	public void setReservaEspecifica(ReservaDTO reservaEspecifica) {
+        this.reservaEspecifica = reservaEspecifica;
     }
+    
+    
     
     /**
      * Retorna una representación en cadena de la reserva.
      * 
      * @return Una cadena que representa la reserva.
      */
+
     @Override
     public String toString() {
-        return "Reserva [idUsuario=" + idUsuario + ", fechaHora=" + fechaHora + ", duracionMinutos=" + duracionMinutos
-                + ", idPista=" + idPista + ", precio=" + precio + ", descuento=" + descuento + "]";
+        StringBuilder sb = new StringBuilder();
+        sb.append("  ID Usuario: ").append(idUsuario).append("\n")
+          .append("  Fecha y Hora: ").append(fechaHora).append("\n")
+          .append("  Pista: ").append(idPista).append("\n")
+          .append("  Duración: ").append(duracionMinutos).append(" minutos\n")
+          .append("  Precio Total (Con descuento): ").append(precio).append("\n")
+          .append("  Descuento aplicado: ").append(descuento * 100).append("%");
+
+        // Incluye los detalles específicos de la reserva, solo si esta existe
+        if (reservaEspecifica != null) {
+            sb.append("\n").append(reservaEspecifica.toString());
+        }
+        
+        return sb.toString();
     }
+
 }
+
+

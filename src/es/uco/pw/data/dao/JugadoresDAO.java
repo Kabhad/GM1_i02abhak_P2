@@ -277,4 +277,82 @@ public class JugadoresDAO {
             }
         }	
     }
+    
+    /**
+     * Busca un jugador en la base de datos por su ID.
+     *
+     * @param idJugador El ID del jugador a buscar.
+     * @return Un objeto JugadorDTO con los datos del jugador si se encuentra, o null si no existe.
+     */
+    public JugadorDTO buscarJugadorPorId(int idJugador) {
+        DBConnection connection = new DBConnection();
+        con = (Connection) connection.getConnection();
+
+        try {
+            PreparedStatement ps = (PreparedStatement) con.prepareStatement(prop.getProperty("buscarJugadorPorId"));
+            ps.setInt(1, idJugador);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                JugadorDTO jugador = new JugadorDTO();
+                jugador.setIdJugador(rs.getInt("idJugador"));
+                jugador.setNombreApellidos(rs.getString("nombreApellidos"));
+                jugador.setFechaNacimiento(rs.getDate("fechaNacimiento"));
+                jugador.setFechaInscripcion(rs.getDate("fechaInscripcion"));
+                jugador.setCorreoElectronico(rs.getString("correo"));
+                jugador.setCuentaActiva(rs.getInt("cuentaActiva") == 1);
+                return jugador;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return null; // Si el jugador no se encuentra
+    }
+    
+    /**
+     * Busca un jugador en la base de datos por su correo electrónico.
+     *
+     * @param correoElectronico El correo electrónico del jugador a buscar.
+     * @return Un objeto JugadorDTO con los datos del jugador si se encuentra, o null si no existe.
+     */
+    public JugadorDTO buscarJugadorPorCorreo(String correoElectronico) {
+        DBConnection connection = new DBConnection();
+        con = (Connection) connection.getConnection();
+
+        try {
+            PreparedStatement ps = (PreparedStatement) con.prepareStatement(prop.getProperty("buscarJugadorInscritoPorCorreo"));
+            ps.setString(1, correoElectronico);
+
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                JugadorDTO jugador = new JugadorDTO();
+                jugador.setIdJugador(rs.getInt("idJugador"));
+                jugador.setNombreApellidos(rs.getString("nombreApellidos"));
+                jugador.setFechaNacimiento(rs.getDate("fechaNacimiento"));
+                jugador.setFechaInscripcion(rs.getDate("fechaInscripcion"));
+                jugador.setCorreoElectronico(rs.getString("correo"));
+                jugador.setCuentaActiva(rs.getInt("cuentaActiva") == 1);
+                return jugador;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return null; // Si el jugador no se encuentra
+    }
+
+
 }

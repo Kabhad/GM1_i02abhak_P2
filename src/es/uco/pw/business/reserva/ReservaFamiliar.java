@@ -40,12 +40,14 @@ public class ReservaFamiliar extends ReservaDTO {
         this.numeroNinos = numeroNinos;
     }
 
-    // Método toString específico para ReservaFamiliar
     @Override
     public String toString() {
-        return super.toString() + ", numeroAdultos=" + numeroAdultos + ", numeroNinos=" + numeroNinos + "]";
+        return "  Tipo de Reserva: Familiar\n" +
+               "  Número de Adultos: " + numeroAdultos + "\n" +
+               "  Número de Niños: " + numeroNinos;
     }
-    
+
+
     /**
      * Método que devuelve una representación específica de la reserva familiar.
      *

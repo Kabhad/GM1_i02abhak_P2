@@ -49,7 +49,8 @@ public class ReservasDAO {
      * @return El jugador encontrado o null si no se encuentra.
      */
     public static JugadorDTO buscarJugadorPorId(int idJugador) {
-        return JugadoresDAO.getInstance().buscarJugadorPorId(idJugador);
+        JugadoresDAO jugadoresDAO = new JugadoresDAO();  // Crear una instancia de JugadoresDAO
+        return jugadoresDAO.buscarJugadorPorId(idJugador);
     }
     
     private void insertarReservaFamiliar(int idReserva, int numeroAdultos, int numeroNinos) throws SQLException {
@@ -107,16 +108,31 @@ public class ReservasDAO {
                 }
             }
 
-            // Si se generó el `idReserva`, se inserta en la tabla específica según el tipo de reserva
+         // Si se generó el `idReserva`, se inserta en la tabla específica según el tipo de reserva
             if (idReserva != -1) {
-                if (reservaDTO instanceof ReservaFamiliar) {
-                    insertarReservaFamiliar(idReserva, ((ReservaFamiliar) reservaDTO).getNumeroAdultos(), ((ReservaFamiliar) reservaDTO).getNumeroNinos());
-                } else if (reservaDTO instanceof ReservaAdulto) {
-                    insertarReservaAdulto(idReserva, ((ReservaAdulto) reservaDTO).getNumeroAdultos());
-                } else if (reservaDTO instanceof ReservaInfantil) {
-                    insertarReservaInfantil(idReserva, ((ReservaInfantil) reservaDTO).getNumeroNinos());
+                ReservaDTO reservaEspecifica = null;
+                if (reservaDTO instanceof ReservaIndividual) {
+                    reservaEspecifica = ((ReservaIndividual) reservaDTO).getReservaEspecifica();
+                } else if (reservaDTO instanceof ReservaBono) {
+                    reservaEspecifica = ((ReservaBono) reservaDTO).getReservaEspecifica();
+                }
+
+                if (reservaEspecifica != null) {
+                    if (reservaEspecifica instanceof ReservaFamiliar) {
+                        System.out.println("Entramos aquí en ReservaFamiliar");
+                        insertarReservaFamiliar(idReserva, ((ReservaFamiliar) reservaEspecifica).getNumeroAdultos(), ((ReservaFamiliar) reservaEspecifica).getNumeroNinos());
+                    } else if (reservaEspecifica instanceof ReservaAdulto) {
+                        System.out.println("Entramos aquí en ReservaAdulto");
+                        insertarReservaAdulto(idReserva, ((ReservaAdulto) reservaEspecifica).getNumeroAdultos());
+                    } else if (reservaEspecifica instanceof ReservaInfantil) {
+                        System.out.println("Entramos aquí en ReservaInfantil");
+                        insertarReservaInfantil(idReserva, ((ReservaInfantil) reservaEspecifica).getNumeroNinos());
+                    }
+                } else {
+                    System.out.println("Error: Tipo de reserva específica no encontrada para idReserva " + idReserva);
                 }
             }
+
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -128,6 +144,12 @@ public class ReservasDAO {
     public Bono obtenerBono(int idBono) {
         Bono bono = null;
         String sql = prop.getProperty("obtenerBono");
+
+        // Verifica que la conexión esté abierta, de lo contrario, abre una nueva
+        if (con == null || con.isClosed()) {
+            DBConnection conexion = new DBConnection();
+            con = (Connection) conexion.getConnection();
+        }
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idBono);
@@ -146,6 +168,90 @@ public class ReservasDAO {
         return bono;
     }
     
+    public Bono crearNuevoBono(int idUsuario) {
+        Bono bono = new Bono();
+        bono.setIdUsuario(idUsuario);
+        bono.setSesionesRestantes(5); // Inicializamos con 5 sesiones restantes
+        Date fechaPrimeraReserva = new Date(); // Fecha de creación como fecha de primera reserva
+        bono.setFechaCaducidad(bono.calcularFechaCaducidad(fechaPrimeraReserva));
+
+        String sql = prop.getProperty("insertarBono");
+
+        try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, idUsuario);
+            ps.setInt(2, bono.getSesionesRestantes());
+            ps.setDate(3, new java.sql.Date(bono.getFechaCaducidad().getTime()));
+
+            ps.executeUpdate();
+
+            // Obtener el `idBono` generado por la base de datos y asignarlo al bono
+            try (ResultSet rs = (ResultSet) ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    bono.setIdBono(rs.getInt(1));
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return bono;
+    }
+
+
+    public void actualizarReserva(int idReserva, Date nuevaFechaHora, int nuevaDuracionMinutos, float nuevoPrecio, float nuevoDescuento, int nuevaIdPista, Integer numeroAdultos, Integer numeroNinos) {
+        String sqlActualizarReserva = prop.getProperty("actualizarReserva");
+        String sqlActualizarReservaInfantil = prop.getProperty("actualizarReservaInfantil");
+        String sqlActualizarReservaFamiliar = prop.getProperty("actualizarReservaFamiliar");
+        String sqlActualizarReservaAdulto = prop.getProperty("actualizarReservaAdulto");
+
+        DBConnection conexion = new DBConnection();
+        try (Connection con = (Connection) conexion.getConnection()) {  // Usa try-with-resources para asegurar el cierre de la conexión
+
+            // Actualizar la tabla principal `Reserva`
+            try (PreparedStatement ps = con.prepareStatement(sqlActualizarReserva)) {
+                ps.setTimestamp(1, new java.sql.Timestamp(nuevaFechaHora.getTime()));
+                ps.setInt(2, nuevaDuracionMinutos);
+                ps.setFloat(3, nuevoPrecio);
+                ps.setFloat(4, nuevoDescuento);
+                ps.setInt(5, nuevaIdPista);
+                ps.setInt(6, idReserva);
+                int affectedRows = ps.executeUpdate();
+                System.out.println("Actualización en tabla Reserva: " + affectedRows + " filas afectadas.");
+            }
+
+            // Actualizar tabla específica según el tipo de reserva
+            if (numeroNinos != null && numeroAdultos == null) {  // Infantil
+                try (PreparedStatement psInfantil = con.prepareStatement(sqlActualizarReservaInfantil)) {
+                    psInfantil.setInt(1, numeroNinos);
+                    psInfantil.setInt(2, idReserva);
+                    int affectedRowsInfantil = psInfantil.executeUpdate();
+                    System.out.println("Actualización en tabla ReservaInfantil: " + affectedRowsInfantil + " filas afectadas.");
+                }
+            } else if (numeroNinos != null && numeroAdultos != null) {  // Familiar
+                try (PreparedStatement psFamiliar = con.prepareStatement(sqlActualizarReservaFamiliar)) {
+                    psFamiliar.setInt(1, numeroAdultos);
+                    psFamiliar.setInt(2, numeroNinos);
+                    psFamiliar.setInt(3, idReserva);
+                    int affectedRowsFamiliar = psFamiliar.executeUpdate();
+                    System.out.println("Actualización en tabla ReservaFamiliar: " + affectedRowsFamiliar + " filas afectadas.");
+                }
+            } else if (numeroAdultos != null && numeroNinos == null) {  // Adulto
+                try (PreparedStatement psAdulto = con.prepareStatement(sqlActualizarReservaAdulto)) {
+                    psAdulto.setInt(1, numeroAdultos);
+                    psAdulto.setInt(2, idReserva);
+                    int affectedRowsAdulto = psAdulto.executeUpdate();
+                    System.out.println("Actualización en tabla ReservaAdulto: " + affectedRowsAdulto + " filas afectadas.");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+
+    
     public void actualizarSesionesBono(int idBono) {
         String sql = prop.getProperty("actualizarSesionesBono");
 
@@ -158,15 +264,59 @@ public class ReservasDAO {
     }
     
     public void eliminarReserva(int idReserva) {
-        String sql = prop.getProperty("eliminarReserva");
+        String sqlEliminarReserva = prop.getProperty("eliminarReserva");
+        DBConnection conexion = new DBConnection();
 
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, idReserva);
-            ps.executeUpdate();
+        try (Connection con = (Connection) conexion.getConnection()) {
+            // Eliminar la reserva en la tabla principal `Reserva`
+            try (PreparedStatement ps = con.prepareStatement(sqlEliminarReserva)) {
+                ps.setInt(1, idReserva);
+                int affectedRows = ps.executeUpdate();
+                System.out.println("Eliminación en tabla Reserva: " + affectedRows + " filas afectadas.");
+            }
+
+            // Llamar al método para eliminar en las tablas específicas
+            eliminarReservaEspecifica(idReserva);
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
+    
+    public void eliminarReservaEspecifica(int idReserva) {
+        // Consultas SQL para eliminar la reserva en las tablas específicas
+        String sqlEliminarReservaInfantil = prop.getProperty("eliminarReservaInfantil");
+        String sqlEliminarReservaFamiliar = prop.getProperty("eliminarReservaFamiliar");
+        String sqlEliminarReservaAdulto = prop.getProperty("eliminarReservaAdulto");
+
+        DBConnection conexion = new DBConnection();
+
+        try (Connection con = (Connection) conexion.getConnection()) {
+            // Intentar eliminar en cada tabla específica. Solo una debería coincidir.
+            try (PreparedStatement psInfantil = con.prepareStatement(sqlEliminarReservaInfantil)) {
+                psInfantil.setInt(1, idReserva);
+                int affectedRowsInfantil = psInfantil.executeUpdate();
+                System.out.println("Intento de eliminación en ReservaInfantil: " + affectedRowsInfantil + " filas afectadas.");
+            }
+
+            try (PreparedStatement psFamiliar = con.prepareStatement(sqlEliminarReservaFamiliar)) {
+                psFamiliar.setInt(1, idReserva);
+                int affectedRowsFamiliar = psFamiliar.executeUpdate();
+                System.out.println("Intento de eliminación en ReservaFamiliar: " + affectedRowsFamiliar + " filas afectadas.");
+            }
+
+            try (PreparedStatement psAdulto = con.prepareStatement(sqlEliminarReservaAdulto)) {
+                psAdulto.setInt(1, idReserva);
+                int affectedRowsAdulto = psAdulto.executeUpdate();
+                System.out.println("Intento de eliminación en ReservaAdulto: " + affectedRowsAdulto + " filas afectadas.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 
 
 
@@ -202,28 +352,35 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
         }
 
-        boolean tieneAntiguedad = jugadorDTO.calcularAntiguedad() > 2;
+        // Calcular el descuento por antigüedad si el jugador tiene más de 2 años de inscripción
+        float descuentoAntiguedad = (jugadorDTO.calcularAntiguedad() > 2) ? 0.1f : 0.0f;
 
-        ReservaDTO reservaDTO = ReservaGeneralFactory.crearReserva(
-                tipoReserva,
-                jugadorDTO.getIdJugador(),
-                fechaHora,
-                duracionMinutos,
-                pistaDTO.getIdPista(),
-                numeroAdultos,
-                numeroNinos,
-                tieneAntiguedad,
-                null,
-                0
-        );
+        ReservaFactory reservaFactory = new ReservaIndividualFactory();
+        ReservaDTO reservaDTO;
 
+        switch (tipoReserva.toLowerCase()) {
+            case "infantil":
+                reservaDTO = reservaFactory.crearReservaInfantil(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroNinos);
+                break;
+            case "familiar":
+                reservaDTO = reservaFactory.crearReservaFamiliar(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroAdultos, numeroNinos);
+                break;
+            case "adulto":
+                reservaDTO = reservaFactory.crearReservaAdulto(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroAdultos);
+                break;
+            default:
+                throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
+        }
+
+        // Aplicar el descuento calculado a la reserva
+        reservaDTO.setDescuento(descuentoAntiguedad);
+
+        // Insertar la reserva en la base de datos
         ReservasDAO reservasDAO = new ReservasDAO();
         int idReserva = reservasDAO.insertarReserva(reservaDTO);
         reservaDTO.setIdReserva(idReserva);
-        return 1;
+        return idReserva;
     }
-
-
 
     /**
      * Realiza una reserva utilizando un bono para un jugador.
@@ -243,6 +400,7 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La cuenta del jugador no está activa.");
         }
 
+        // Validar que la reserva sea para una fecha futura con al menos 6 horas de antelación
         Date ahora = new Date();
         Calendar calendario = Calendar.getInstance();
         calendario.setTime(ahora);
@@ -262,23 +420,28 @@ public class ReservasDAO {
             throw new IllegalArgumentException("El bono no tiene sesiones disponibles.");
         }
 
-        ReservaDTO reservaDTO = ReservaGeneralFactory.crearReserva(
-            tipoReserva,
-            jugadorDTO.getIdJugador(),
-            fechaHora,
-            duracionMinutos,
-            pistaDTO.getIdPista(),
-            numeroAdultos,
-            numeroNinos,
-            false,
-            bono,
-            numeroSesion
-        );
+        ReservaFactory reservaFactory = new ReservaBonoFactory();
+        ReservaDTO reservaDTO;
+
+        switch (tipoReserva.toLowerCase()) {
+            case "infantil":
+                reservaDTO = reservaFactory.crearReservaInfantil(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroNinos, bono, numeroSesion);
+                break;
+            case "familiar":
+                reservaDTO = reservaFactory.crearReservaFamiliar(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroAdultos, numeroNinos, bono, numeroSesion);
+                break;
+            case "adulto":
+                reservaDTO = reservaFactory.crearReservaAdulto(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroAdultos, bono, numeroSesion);
+                break;
+            default:
+                throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
+        }
 
         int idReserva = insertarReserva(reservaDTO);
         reservaDTO.setIdReserva(idReserva);
         actualizarSesionesBono(bono.getIdBono());
     }
+
 
 
 
@@ -318,27 +481,17 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
         }
 
-        // Cancelar la reserva original en la base de datos
-        cancelarReserva(jugadorDTO, pistaOriginal, fechaHoraOriginal);
+        // Calcular el nuevo precio y descuento de la reserva
+        float nuevoPrecio = ReservaDTO.calcularPrecio(nuevaDuracionMinutos, reservaExistente.getDescuento());
+        System.out.println("ID reserva: " + reservaExistente.getIdReserva());
+        // Actualizar la reserva en la base de datos con los parámetros específicos
+        actualizarReserva(reservaExistente.getIdReserva(), nuevaFechaHora, nuevaDuracionMinutos, nuevoPrecio, reservaExistente.getDescuento(), nuevaPista.getIdPista(), 
+                          tipoReserva.equals("familiar") || tipoReserva.equals("adulto") ? numeroAdultos : null, 
+                          tipoReserva.equals("familiar") || tipoReserva.equals("infantil") ? numeroNinos : null);
 
-        // Crear una nueva reserva con los parámetros actualizados sin asignar reserva específica aún
-        ReservaDTO nuevaReserva;
-        if (bono == null) {
-            nuevaReserva = new ReservaIndividual(jugadorDTO.getIdJugador(), nuevaFechaHora, nuevaDuracionMinutos, nuevaPista.getIdPista(), null);
-        } else {
-            nuevaReserva = new ReservaBono(jugadorDTO.getIdJugador(), nuevaFechaHora, nuevaDuracionMinutos, nuevaPista.getIdPista(), bono, numeroSesion, null);
-        }
-
-        // Insertar la nueva reserva en la base de datos y obtener su ID
-        int idNuevaReserva = insertarReserva(nuevaReserva);
-        nuevaReserva.setIdReserva(idNuevaReserva);
-
-        // Asignar la reserva específica usando el ID de la nueva reserva
-        ReservaDTO reservaEspecifica = obtenerReservaEspecifica(idNuevaReserva);
-        if (nuevaReserva instanceof ReservaBono) {
-            ((ReservaBono) nuevaReserva).setReservaEspecifica(reservaEspecifica);
-        } else if (nuevaReserva instanceof ReservaIndividual) {
-            ((ReservaIndividual) nuevaReserva).setReservaEspecifica(reservaEspecifica);
+        // Opcional: actualizar el número de sesión en el bono si se ha decidido consumir otra sesión
+        if (bono != null) {
+            actualizarSesionesBono(bono.getIdBono());
         }
     }
 
@@ -401,33 +554,65 @@ public class ReservasDAO {
                     int duracionMin = rs.getInt("duracionMin");
                     float precio = rs.getFloat("precio");
                     float descuento = rs.getFloat("descuento");
-                    Integer idBono = (Integer) rs.getObject("idBono");
-                    Integer numeroSesion = null;
-                    try {
-                        numeroSesion = rs.getObject("numeroSesion") != null ? rs.getInt("numeroSesion") : null;
-                    } catch (SQLException e) {
-                        // Manejar el caso donde la columna no existe
-                        System.out.println("Advertencia: no se encontró la columna 'numeroSesion'.");
-                    }
+                    Integer idBono = rs.getObject("idBono") != null ? rs.getInt("idBono") : null;
+                    Integer numeroSesion = rs.getObject("numeroSesion") != null ? rs.getInt("numeroSesion") : null;
 
-                    ReservaDTO reservaDTO;
-                    if (idBono != null && numeroSesion != null) {
-                        // Crear instancia de Bono con el número de sesión
-                        Bono bono = new Bono(idBono, idJugador, numeroSesion, fechaHora);
-                        ReservaDTO reservaEspecifica = obtenerReservaEspecifica(idReserva);
+                    ReservaFactory reservaFactory = (idBono != null) ? new ReservaBonoFactory() : new ReservaIndividualFactory();
+                    ReservaDTO reservaDTO = null;
 
-                        if (reservaEspecifica == null) {
-                            System.out.println("Error: reserva específica no encontrada.");
-                            continue;  // Saltar esta iteración si no se encuentra la reserva específica
+                    // Consulta para determinar si es una ReservaFamiliar
+                    String sqlFamiliar = prop.getProperty("buscarReservaFamiliar");
+                    try (PreparedStatement psFamiliar = con.prepareStatement(sqlFamiliar)) {
+                        psFamiliar.setInt(1, idReserva);
+                        try (ResultSet rsFamiliar = (ResultSet) psFamiliar.executeQuery()) {
+                            if (rsFamiliar.next()) {
+                                int numeroAdultos = rsFamiliar.getInt("numAdultos");
+                                int numeroNinos = rsFamiliar.getInt("numNinos");
+                                reservaDTO = (idBono != null)
+                                        ? reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                        : reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos);
+                            }
                         }
-
-                        // Crear el objeto de reserva con bono
-                        reservaDTO = new ReservaBono(idJugador, fechaHora, duracionMin, idPista, bono, numeroSesion, reservaEspecifica);
-                        
-                    } else {
-                        reservaDTO = new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
                     }
 
+                    // Consulta para determinar si es una ReservaAdulto
+                    if (reservaDTO == null) { // Solo si aún no se ha asignado
+                        String sqlAdulto = prop.getProperty("buscarReservaAdulto");
+                        try (PreparedStatement psAdulto = con.prepareStatement(sqlAdulto)) {
+                            psAdulto.setInt(1, idReserva);
+                            try (ResultSet rsAdulto = (ResultSet) psAdulto.executeQuery()) {
+                                if (rsAdulto.next()) {
+                                    int numeroAdultos = rsAdulto.getInt("numAdultos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos);
+                                }
+                            }
+                        }
+                    }
+
+                    // Consulta para determinar si es una ReservaInfantil
+                    if (reservaDTO == null) { // Solo si aún no se ha asignado
+                        String sqlInfantil = prop.getProperty("buscarReservaInfantil");
+                        try (PreparedStatement psInfantil = con.prepareStatement(sqlInfantil)) {
+                            psInfantil.setInt(1, idReserva);
+                            try (ResultSet rsInfantil = (ResultSet) psInfantil.executeQuery()) {
+                                if (rsInfantil.next()) {
+                                    int numeroNinos = rsInfantil.getInt("numNinos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos);
+                                }
+                            }
+                        }
+                    }
+
+                    if (reservaDTO == null) {
+                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
+                        continue;
+                    }
+
+                    // Asignar precio y descuento a la reserva
                     reservaDTO.setIdReserva(idReserva);
                     reservaDTO.setPrecio(precio);
                     reservaDTO.setDescuento(descuento);
@@ -437,10 +622,18 @@ public class ReservasDAO {
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
         return reservasFuturas;
     }
+
+
 
     /**
      * Consulta las reservas para un día específico y una pista específica.
@@ -452,11 +645,11 @@ public class ReservasDAO {
 
     public List<ReservaDTO> consultarReservasPorRangosDeFechaYPista(Date fechaInicio, Date fechaFin, int idPistaConsulta) {
         List<ReservaDTO> reservasPorFecha = new ArrayList<>();
-        String sql = prop.getProperty("consultarReservasPorFecha"); // Asegúrate de que la consulta esté configurada en tu archivo de propiedades
+        String sql = prop.getProperty("consultarReservasPorRangoDeFechasYPista");
         DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
 
-        // Ajustar la fecha de inicio al inicio del día (00:00:00)
+        // Ajustar las fechas de inicio y fin
         Calendar calInicio = Calendar.getInstance();
         calInicio.setTime(fechaInicio);
         calInicio.set(Calendar.HOUR_OF_DAY, 0);
@@ -465,7 +658,6 @@ public class ReservasDAO {
         calInicio.set(Calendar.MILLISECOND, 0);
         Date fechaInicioAjustada = calInicio.getTime();
 
-        // Ajustar la fecha de fin al final del día (23:59:59)
         Calendar calFin = Calendar.getInstance();
         calFin.setTime(fechaFin);
         calFin.set(Calendar.HOUR_OF_DAY, 23);
@@ -477,6 +669,7 @@ public class ReservasDAO {
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setTimestamp(1, new java.sql.Timestamp(fechaInicioAjustada.getTime()));
             ps.setTimestamp(2, new java.sql.Timestamp(fechaFinAjustada.getTime()));
+            ps.setInt(3, idPistaConsulta);
 
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
                 while (rs.next()) {
@@ -490,40 +683,80 @@ public class ReservasDAO {
                     Integer idBono = rs.getObject("idBono") != null ? rs.getInt("idBono") : null;
                     Integer numeroSesion = rs.getObject("numeroSesion") != null ? rs.getInt("numeroSesion") : null;
 
-                    ReservaDTO reservaDTO;
+                    // Crear la fábrica adecuada
+                    ReservaFactory reservaFactory = (idBono != null) ? new ReservaBonoFactory() : new ReservaIndividualFactory();
+                    ReservaDTO reservaDTO = null;
 
-                    // Si hay bono y número de sesión asociado
-                    if (idBono != null && numeroSesion != null) {
-                        // Crear instancia de Bono con el número de sesión
-                        Bono bono = new Bono(idBono, idJugador, numeroSesion, fechaHora);
-                        ReservaDTO reservaEspecifica = obtenerReservaEspecifica(idReserva);
-
-                        if (reservaEspecifica == null) {
-                            System.out.println("Error: reserva específica no encontrada.");
-                            continue;  // Saltar esta iteración si no se encuentra la reserva específica
+                    // Verificar el tipo de reserva en la base de datos
+                    String sqlFamiliar = prop.getProperty("buscarReservaFamiliar");
+                    try (PreparedStatement psFamiliar = con.prepareStatement(sqlFamiliar)) {
+                        psFamiliar.setInt(1, idReserva);
+                        try (ResultSet rsFamiliar = (ResultSet) psFamiliar.executeQuery()) {
+                            if (rsFamiliar.next()) {
+                                int numeroAdultos = rsFamiliar.getInt("numAdultos");
+                                int numeroNinos = rsFamiliar.getInt("numNinos");
+                                reservaDTO = (idBono != null)
+                                        ? reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                        : reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos);
+                            }
                         }
-
-                        // Crear la reserva con bono
-                        reservaDTO = new ReservaBono(idJugador, fechaHora, duracionMin, idPista, bono, numeroSesion, reservaEspecifica);
-
-                        // Mostrar el valor de `numeroSesion` y bono para verificación
-                        System.out.println("Reserva con bono - ID Bono: " + idBono + ", Numero de Sesion: " + numeroSesion + ", Sesiones Restantes: " + bono.getSesionesRestantes());
-                    } else {
-                        // Si no hay bono, crear una reserva individual
-                        reservaDTO = new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
                     }
 
-                    // Establecer el precio y el descuento
+                    // Si no es familiar, verificar si es adulto
+                    if (reservaDTO == null) {
+                        String sqlAdulto = prop.getProperty("buscarReservaAdulto");
+                        try (PreparedStatement psAdulto = con.prepareStatement(sqlAdulto)) {
+                            psAdulto.setInt(1, idReserva);
+                            try (ResultSet rsAdulto = (ResultSet) psAdulto.executeQuery()) {
+                                if (rsAdulto.next()) {
+                                    int numeroAdultos = rsAdulto.getInt("numAdultos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos);
+                                }
+                            }
+                        }
+                    }
+
+                    // Si no es familiar ni adulto, verificar si es infantil
+                    if (reservaDTO == null) {
+                        String sqlInfantil = prop.getProperty("buscarReservaInfantil");
+                        try (PreparedStatement psInfantil = con.prepareStatement(sqlInfantil)) {
+                            psInfantil.setInt(1, idReserva);
+                            try (ResultSet rsInfantil = (ResultSet) psInfantil.executeQuery()) {
+                                if (rsInfantil.next()) {
+                                    int numeroNinos = rsInfantil.getInt("numNinos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos);
+                                }
+                            }
+                        }
+                    }
+
+                    // Verificar si la reserva fue creada, si no, continuar con la siguiente
+                    if (reservaDTO == null) {
+                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
+                        continue;
+                    }
+
+                    // Asignar precio y descuento a la reserva
                     reservaDTO.setIdReserva(idReserva);
                     reservaDTO.setPrecio(precio);
                     reservaDTO.setDescuento(descuento);
 
-                    // Agregar la reserva a la lista
+                    // Agregar la reserva a la lista de resultados
                     reservasPorFecha.add(reservaDTO);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
         return reservasPorFecha;
@@ -532,129 +765,214 @@ public class ReservasDAO {
 
 
     /**
-     * Encuentra una reserva por ID de usuario, ID de pista y fecha.
+     * Obtiene una reserva completa usando el patrón Factory.
      *
-     * @param idJugador El ID del usuario que realizó la reserva.
-     * @param idPista El ID de la pista de la reserva.
-     * @param fechaHora La fecha y hora de la reserva.
-     * @return La reserva encontrada, o null si no se encuentra.
+     * @param idReserva El ID de la reserva.
+     * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto).
      */
-    
-    private ReservaDTO obtenerReservaEspecifica(int idReserva) {
-        // Consulta básica para obtener los datos comunes de la reserva
-        String sqlBaseReserva = "SELECT idJugador, fechaHora, duracionMin, idPista, precio, descuento FROM Reserva WHERE idReserva = ?";
+    public ReservaDTO obtenerReservaCompleta(int idReserva) {
+        String sqlBaseReserva = prop.getProperty("buscarReservaBase");
+        DBConnection conexion = new DBConnection();
+        con = (Connection) conexion.getConnection();
         
         try (PreparedStatement psBase = con.prepareStatement(sqlBaseReserva)) {
             psBase.setInt(1, idReserva);
-            
+
             try (ResultSet rsBase = (ResultSet) psBase.executeQuery()) {
                 if (rsBase.next()) {
+                    // Datos básicos de la reserva
                     int idJugador = rsBase.getInt("idJugador");
-                    Date fechaHora = rsBase.getDate("fechaHora");
+                    Date fechaHora = rsBase.getTimestamp("fechaHora");
                     int duracionMin = rsBase.getInt("duracionMin");
                     int idPista = rsBase.getInt("idPista");
                     float precio = rsBase.getFloat("precio");
                     float descuento = rsBase.getFloat("descuento");
+                    Integer idBono = rsBase.getObject("idBono") != null ? rsBase.getInt("idBono") : null;
+                    Integer numeroSesion = rsBase.getObject("numeroSesion") != null ? rsBase.getInt("numeroSesion") : null;
 
-                    // Verificar si es una reserva familiar
+                    // Seleccionar la fábrica según el tipo de reserva (con o sin bono)
+                    ReservaFactory reservaFactory = (idBono != null) ? new ReservaBonoFactory() : new ReservaIndividualFactory();
+                    ReservaDTO reservaDTO = null;
+
+                    // Verificar si es una ReservaFamiliar
                     String sqlFamiliar = prop.getProperty("buscarReservaFamiliar");
                     try (PreparedStatement psFamiliar = con.prepareStatement(sqlFamiliar)) {
                         psFamiliar.setInt(1, idReserva);
                         try (ResultSet rsFamiliar = (ResultSet) psFamiliar.executeQuery()) {
                             if (rsFamiliar.next()) {
-                                int numAdultos = rsFamiliar.getInt("numAdultos");
-                                int numNinos = rsFamiliar.getInt("numNinos");
-                                ReservaFamiliar reservaFamiliar = new ReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numAdultos, numNinos);
-                                reservaFamiliar.setPrecio(precio);
-                                reservaFamiliar.setDescuento(descuento);
-                                return reservaFamiliar;
+                                int numeroAdultos = rsFamiliar.getInt("numAdultos");
+                                int numeroNinos = rsFamiliar.getInt("numNinos");
+                                reservaDTO = (idBono != null)
+                                        ? reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                        : reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos);
                             }
                         }
                     }
 
-                    // Verificar si es una reserva adulto
-                    String sqlAdulto = prop.getProperty("buscarReservaAdulto");
-                    try (PreparedStatement psAdulto = con.prepareStatement(sqlAdulto)) {
-                        psAdulto.setInt(1, idReserva);
-                        try (ResultSet rsAdulto = (ResultSet) psAdulto.executeQuery()) {
-                            if (rsAdulto.next()) {
-                                int numAdultos = rsAdulto.getInt("numAdultos");
-                                ReservaAdulto reservaAdulto = new ReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numAdultos);
-                                reservaAdulto.setPrecio(precio);
-                                reservaAdulto.setDescuento(descuento);
-                                return reservaAdulto;
+                    // Verificar si es una ReservaAdulto, si no se encontró como familiar
+                    if (reservaDTO == null) {
+                        String sqlAdulto = prop.getProperty("buscarReservaAdulto");
+                        try (PreparedStatement psAdulto = con.prepareStatement(sqlAdulto)) {
+                            psAdulto.setInt(1, idReserva);
+                            try (ResultSet rsAdulto = (ResultSet) psAdulto.executeQuery()) {
+                                if (rsAdulto.next()) {
+                                    int numeroAdultos = rsAdulto.getInt("numAdultos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos);
+                                }
                             }
                         }
                     }
 
-                    // Verificar si es una reserva infantil
-                    String sqlInfantil = prop.getProperty("buscarReservaInfantil");
-                    try (PreparedStatement psInfantil = con.prepareStatement(sqlInfantil)) {
-                        psInfantil.setInt(1, idReserva);
-                        try (ResultSet rsInfantil = (ResultSet) psInfantil.executeQuery()) {
-                            if (rsInfantil.next()) {
-                                int numNinos = rsInfantil.getInt("numNinos");
-                                ReservaInfantil reservaInfantil = new ReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numNinos);
-                                reservaInfantil.setPrecio(precio);
-                                reservaInfantil.setDescuento(descuento);
-                                return reservaInfantil;
+                    // Verificar si es una ReservaInfantil, si no se encontró como familiar o adulto
+                    if (reservaDTO == null) {
+                        String sqlInfantil = prop.getProperty("buscarReservaInfantil");
+                        try (PreparedStatement psInfantil = con.prepareStatement(sqlInfantil)) {
+                            psInfantil.setInt(1, idReserva);
+                            try (ResultSet rsInfantil = (ResultSet) psInfantil.executeQuery()) {
+                                if (rsInfantil.next()) {
+                                    int numeroNinos = rsInfantil.getInt("numNinos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos);
+                                }
                             }
                         }
                     }
+
+                    // Si no se encontró ningún tipo de reserva específico, lanzar error
+                    if (reservaDTO == null) {
+                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
+                        return null;
+                    }
+
+                    // Asignar precio y descuento a la reserva
+                    reservaDTO.setIdReserva(idReserva);
+                    reservaDTO.setPrecio(precio);
+                    reservaDTO.setDescuento(descuento);
+
+                    return reservaDTO;
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
-        System.out.println("Error: reserva específica no encontrada.");
+        System.out.println("Error: reserva no encontrada en la base de datos.");
         return null;
     }
 
-
-
-    
+    /**
+     * Encuentra una reserva completa en función del idJugador, idPista y fechaHora.
+     *
+     * @param idJugador El ID del jugador.
+     * @param idPista El ID de la pista.
+     * @param fechaHora La fecha y hora de la reserva.
+     * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto).
+     */
     public ReservaDTO encontrarReserva(int idJugador, int idPista, Date fechaHora) {
         ReservaDTO reservaDTO = null;
-        String sql = prop.getProperty("encontrarReserva");
+        String sqlBaseReserva = prop.getProperty("encontrarReserva");
 
-        // Obtener conexión a la base de datos
         DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
 
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
+        try (PreparedStatement ps = con.prepareStatement(sqlBaseReserva)) {
             ps.setInt(1, idJugador);
             ps.setInt(2, idPista);
             ps.setTimestamp(3, new java.sql.Timestamp(fechaHora.getTime()));
 
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
                 if (rs.next()) {
+                    // Obtener datos comunes de la reserva
                     int idReserva = rs.getInt("idReserva");
                     int duracionMin = rs.getInt("duracionMin");
                     float precio = rs.getFloat("precio");
                     float descuento = rs.getFloat("descuento");
-                    Integer idBono = rs.getObject("idBono", Integer.class);
+                    Integer idBono = rs.getObject("idBono") != null ? rs.getInt("idBono") : null;
+                    Integer numeroSesion = (idBono != null && rs.getObject("numeroSesion") != null) ? rs.getInt("numeroSesion") : null;
 
-                    // Determinar si es una ReservaBono o una ReservaIndividual
-                    if (idBono != null) {
-                        Bono bono = obtenerBono(idBono);
-                        reservaDTO = new ReservaBono(idJugador, fechaHora, duracionMin, idPista, bono, rs.getInt("numeroSesion"), obtenerReservaEspecifica(idReserva));
-                    } else {
-                        reservaDTO = new ReservaIndividual(idJugador, fechaHora, duracionMin, idPista, obtenerReservaEspecifica(idReserva));
+                    // Crear la instancia de la fábrica adecuada
+                    ReservaFactory reservaFactory = (idBono != null) ? new ReservaBonoFactory() : new ReservaIndividualFactory();
+
+                    // Intentar identificar la reserva como familiar
+                    String sqlFamiliar = prop.getProperty("buscarReservaFamiliar");
+                    try (PreparedStatement psFamiliar = con.prepareStatement(sqlFamiliar)) {
+                        psFamiliar.setInt(1, idReserva);
+                        try (ResultSet rsFamiliar = (ResultSet) psFamiliar.executeQuery()) {
+                            if (rsFamiliar.next()) {
+                                int numeroAdultos = rsFamiliar.getInt("numAdultos");
+                                int numeroNinos = rsFamiliar.getInt("numNinos");
+                                reservaDTO = (idBono != null)
+                                        ? reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                        : reservaFactory.crearReservaFamiliar(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos);
+                            }
+                        }
                     }
-                    
-                    // Asignar precio y descuento al objeto de reserva creado
+
+                    // Si no es familiar, intentar identificar como adulto
+                    if (reservaDTO == null) {
+                        String sqlAdulto = prop.getProperty("buscarReservaAdulto");
+                        try (PreparedStatement psAdulto = con.prepareStatement(sqlAdulto)) {
+                            psAdulto.setInt(1, idReserva);
+                            try (ResultSet rsAdulto = (ResultSet) psAdulto.executeQuery()) {
+                                if (rsAdulto.next()) {
+                                    int numeroAdultos = rsAdulto.getInt("numAdultos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaAdulto(idJugador, fechaHora, duracionMin, idPista, numeroAdultos);
+                                }
+                            }
+                        }
+                    }
+
+                    // Si no es ni familiar ni adulto, intentar identificar como infantil
+                    if (reservaDTO == null) {
+                        String sqlInfantil = prop.getProperty("buscarReservaInfantil");
+                        try (PreparedStatement psInfantil = con.prepareStatement(sqlInfantil)) {
+                            psInfantil.setInt(1, idReserva);
+                            try (ResultSet rsInfantil = (ResultSet) psInfantil.executeQuery()) {
+                                if (rsInfantil.next()) {
+                                    int numeroNinos = rsInfantil.getInt("numNinos");
+                                    reservaDTO = (idBono != null)
+                                            ? reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos, obtenerBono(idBono), numeroSesion)
+                                            : reservaFactory.crearReservaInfantil(idJugador, fechaHora, duracionMin, idPista, numeroNinos);
+                                }
+                            }
+                        }
+                    }
+
+                    // Verificar si se creó la reserva; si no, lanzar un error
+                    if (reservaDTO == null) {
+                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
+                        return null;
+                    }
+
+                    reservaDTO.setIdReserva(idReserva);
+                    // Asignar precio y descuento a la reserva
                     reservaDTO.setPrecio(precio);
                     reservaDTO.setDescuento(descuento);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
         return reservaDTO;
     }
-
 
 
     /**
@@ -704,18 +1022,20 @@ public class ReservasDAO {
      * @return El jugador encontrado, o null si no se encuentra.
      */
     public JugadorDTO buscarJugadorPorCorreo(String correoElectronico) {
-        return JugadoresDAO.getInstance().buscarJugadorPorCorreo(correoElectronico);
+        JugadoresDAO jugadoresDAO = new JugadoresDAO();
+        return jugadoresDAO.buscarJugadorPorCorreo(correoElectronico);
     }
 
     /**
-     * Lista las pistas disponibles.
+     * Lista las pistas disponibles para un tipo de reserva específico.
      *
-     * @return Una lista de pistas disponibles.
+     * @param tipoReserva El tipo de reserva (infantil, familiar, adulto).
+     * @return Una lista de pistas disponibles para el tipo de reserva dado.
      */
-    public List<PistaDTO> listarPistasDisponibles() {
+    public List<PistaDTO> listarPistasDisponibles(String tipoReserva) {
         PistasDAO pistasDAO = new PistasDAO(); // Instanciación de PistasDAO
         try {
-            return pistasDAO.buscarPistasDisponibles(); // Llamada al método en PistasDAO
+            return pistasDAO.listarPistasDisponibles(tipoReserva); // Llamada al método en PistasDAO con el tipo de reserva
         } catch (SQLException e) {
             e.printStackTrace();
             return new ArrayList<>(); // Retorna una lista vacía en caso de excepción
