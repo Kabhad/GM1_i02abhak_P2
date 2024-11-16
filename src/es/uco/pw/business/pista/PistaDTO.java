@@ -2,7 +2,6 @@ package es.uco.pw.business.pista;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import es.uco.pw.business.material.*;
 
 /**
@@ -27,17 +26,15 @@ public class PistaDTO {
         this.materiales = new ArrayList<>(); // Inicializar la lista de materiales
     }
 
-    
     /**
      * Constructor parametrizado para inicializar una pista con sus atributos.
      *
-     * @param idPista ID de la pista.
-     * @param nombrePista Nombre de la pista.
-     * @param disponible  Estado de disponibilidad de la pista.
-     * @param exterior    Si la pista es exterior o no.
-     * @param pista       Tamaño de la pista.
-     * @param max_jugadores Número máximo de jugadores permitidos.
-     * @param materiales Lista de materiales
+     * @param idPista       ID de la pista.
+     * @param nombre        Nombre de la pista.
+     * @param disponible    Estado de disponibilidad de la pista.
+     * @param exterior      Si la pista es exterior o no.
+     * @param tamanoPista   Tamaño de la pista.
+     * @param maxJugadores  Número máximo de jugadores permitidos.
      */
     public PistaDTO(int idPista, String nombre, boolean disponible, boolean exterior, TamanoPista tamanoPista, int maxJugadores) {
         this.idPista = idPista;
@@ -49,14 +46,13 @@ public class PistaDTO {
         this.materiales = crearListaMateriales();
     }
 
-
     /**
      * Constructor parametrizado para inicializar una pista con sus atributos.
      *
-     * @param nombrePista Nombre de la pista.
-     * @param disponible  Estado de disponibilidad de la pista.
-     * @param exterior    Si la pista es exterior o no.
-     * @param pista       Tamaño de la pista.
+     * @param nombrePista   Nombre de la pista.
+     * @param disponible    Estado de disponibilidad de la pista.
+     * @param exterior      Si la pista es exterior o no.
+     * @param pista         Tamaño de la pista.
      * @param max_jugadores Número máximo de jugadores permitidos.
      */
     public PistaDTO(String nombrePista, boolean disponible, boolean exterior, TamanoPista pista, int max_jugadores) {
@@ -224,19 +220,34 @@ public class PistaDTO {
         }
         return materialesDisponibles;
     }
-    
-    // Excepciones internas para manejar los errores específicos del método asociarMaterialAPista
+
+    /**
+     * Excepción personalizada para indicar incompatibilidad de material con la pista.
+     */
     public static class MaterialIncompatibleException extends Exception {
         private static final long serialVersionUID = 1L;
 
+        /**
+         * Constructor que acepta un mensaje.
+         *
+         * @param message Mensaje de la excepción.
+         */
         public MaterialIncompatibleException(String message) {
             super(message);
         }
     }
 
+    /**
+     * Excepción personalizada para indicar que se ha alcanzado el máximo de materiales.
+     */
     public static class MaximoMaterialException extends Exception {
         private static final long serialVersionUID = 1L;
 
+        /**
+         * Constructor que acepta un mensaje.
+         *
+         * @param message Mensaje de la excepción.
+         */
         public MaximoMaterialException(String message) {
             super(message);
         }
@@ -244,9 +255,11 @@ public class PistaDTO {
 
     /**
      * Asocia un material a la pista, si cumple las condiciones necesarias.
-     * 
+     *
      * @param materialDTO Material a asociar a la pista.
      * @return True si el material fue añadido exitosamente, False en caso contrario.
+     * @throws MaterialIncompatibleException Si el material no es compatible con la pista.
+     * @throws MaximoMaterialException Si se ha alcanzado el máximo de materiales de ese tipo.
      */
     public boolean asociarMaterialAPista(MaterialDTO materialDTO) throws MaterialIncompatibleException, MaximoMaterialException {
         if (this.exterior && !materialDTO.isUsoExterior()) {
@@ -286,9 +299,13 @@ public class PistaDTO {
         materiales.add(materialDTO);
         return true; // Material añadido exitosamente
     }
-    
+
+    /**
+     * Método privado para crear una nueva lista de materiales.
+     *
+     * @return Lista vacía de materiales.
+     */
     private List<MaterialDTO> crearListaMateriales() {
         return new ArrayList<>(); // Aquí puedes cambiar fácilmente la implementación
     }
 }
-

@@ -3,7 +3,6 @@ package es.uco.pw.displays.pistas;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Scanner;
-
 import es.uco.pw.business.material.*;
 import es.uco.pw.business.pista.PistaDTO;
 import es.uco.pw.business.pista.TamanoPista;
@@ -38,8 +37,9 @@ public class mainPistas {
     /**
      * Método principal para gestionar las opciones del menú.
      *
-     * @param sc Objeto Scanner para la entrada de datos del usuario.
-     * @throws SQLException 
+     * @param sc        Objeto Scanner para la entrada de datos del usuario.
+     * @param pistasDAO Objeto PistasDAO para gestionar las operaciones con la base de datos.
+     * @throws SQLException Si ocurre un error al interactuar con la base de datos.
      */
     public static void main(Scanner sc, PistasDAO pistasDAO) throws SQLException {
         int opcion;
@@ -68,8 +68,8 @@ public class mainPistas {
                         sc.nextLine();
                         pistasDAO.crearPista(nombrePista, disponible, exterior, tamanoPista, maxJugadores);
                         System.out.println("Pista creada con éxito.");
-                    } catch (IllegalArgumentException e){
-                    	System.out.println(e.getMessage());
+                    } catch (IllegalArgumentException e) {
+                        System.out.println(e.getMessage());
                     } catch (Exception e) {
                         System.out.println("Error al crear la pista: " + e.getMessage());
                     }
@@ -92,9 +92,9 @@ public class mainPistas {
                                 : estadoMaterial == 2 ? EstadoMaterial.RESERVADO : EstadoMaterial.MAL_ESTADO;
                         pistasDAO.crearMaterial(idMaterial, tipo, usoExterior, estado);
                         System.out.println("Material creado con éxito.");
-                    } catch (IllegalArgumentException e){
-                    	System.out.println(e.getMessage());
-                    }  catch (Exception e) {
+                    } catch (IllegalArgumentException e) {
+                        System.out.println(e.getMessage());
+                    } catch (Exception e) {
                         System.out.println("Error al crear el material: " + e.getMessage());
                     }
                     break;
@@ -106,7 +106,6 @@ public class mainPistas {
                         String nombreAsociarPista = sc.nextLine();
                         System.out.print("ID del material a asociar: ");
                         int idMaterialAsociar = sc.nextInt();
-                        
                         boolean resultado = pistasDAO.asociarMaterialAPista(nombreAsociarPista, idMaterialAsociar);
                         if (resultado) {
                             System.out.println("Material asociado con éxito.");
@@ -159,4 +158,3 @@ public class mainPistas {
         } while (opcion != 0);
     }
 }
-

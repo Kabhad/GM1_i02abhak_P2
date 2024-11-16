@@ -10,7 +10,7 @@ import java.util.*;
 import java.io.*;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Date;
+
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.ResultSet;
 import com.mysql.jdbc.Statement;
@@ -24,35 +24,40 @@ public class ReservasDAO {
     private Properties prop;
 
     /**
-     * Constructor privado para evitar instanciación directa.
-     * Inicializa la conexion a la BD e instancia reservas.
+     * Constructor que inicializa la conexión a la base de datos y carga las propiedades SQL.
      */
     public ReservasDAO() {
-    	
         prop = new Properties();
-        
         try {
-        	BufferedReader reader = new BufferedReader(new FileReader("sql.properties"));
-        	prop.load(reader);
-        	reader.close();
-        } catch(FileNotFoundException e) {
-        	e.printStackTrace();
-        } catch(IOException e) {
-        	e.printStackTrace();
+            BufferedReader reader = new BufferedReader(new FileReader("sql.properties"));
+            prop.load(reader);
+            reader.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     /**
-     * Busca un jugador por su ID.
-     * 
+     * Busca un jugador por su ID utilizando JugadoresDAO.
+     *
      * @param idJugador El ID del jugador a buscar.
      * @return El jugador encontrado o null si no se encuentra.
      */
     public static JugadorDTO buscarJugadorPorId(int idJugador) {
-        JugadoresDAO jugadoresDAO = new JugadoresDAO();  // Crear una instancia de JugadoresDAO
+        JugadoresDAO jugadoresDAO = new JugadoresDAO();
         return jugadoresDAO.buscarJugadorPorId(idJugador);
     }
-    
+
+    /**
+     * Inserta una reserva familiar en la base de datos.
+     *
+     * @param idReserva     El ID de la reserva.
+     * @param numeroAdultos El número de adultos en la reserva.
+     * @param numeroNinos   El número de niños en la reserva.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     */
     private void insertarReservaFamiliar(int idReserva, int numeroAdultos, int numeroNinos) throws SQLException {
         String sql = prop.getProperty("insertarReservaFamiliar");
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -63,6 +68,13 @@ public class ReservasDAO {
         }
     }
 
+    /**
+     * Inserta una reserva de adultos en la base de datos.
+     *
+     * @param idReserva     El ID de la reserva.
+     * @param numeroAdultos El número de adultos en la reserva.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     */
     private void insertarReservaAdulto(int idReserva, int numeroAdultos) throws SQLException {
         String sql = prop.getProperty("insertarReservaAdulto");
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -72,6 +84,13 @@ public class ReservasDAO {
         }
     }
 
+    /**
+     * Inserta una reserva infantil en la base de datos.
+     *
+     * @param idReserva   El ID de la reserva.
+     * @param numeroNinos El número de niños en la reserva.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     */
     private void insertarReservaInfantil(int idReserva, int numeroNinos) throws SQLException {
         String sql = prop.getProperty("insertarReservaInfantil");
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -81,7 +100,12 @@ public class ReservasDAO {
         }
     }
 
-    
+    /**
+     * Inserta una nueva reserva en la base de datos.
+     *
+     * @param reservaDTO La reserva a insertar.
+     * @return El ID de la reserva generada, o -1 si falla.
+     */
     public int insertarReserva(ReservaDTO reservaDTO) {
         int idReserva = -1;
         String sql = prop.getProperty("insertarReserva");
@@ -89,7 +113,6 @@ public class ReservasDAO {
         con = (Connection) conexion.getConnection();
 
         try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
             // Inserción en la tabla `Reserva`
             ps.setInt(1, reservaDTO.getIdUsuario());
             ps.setInt(2, reservaDTO.getIdPista());
@@ -98,17 +121,16 @@ public class ReservasDAO {
             ps.setFloat(5, reservaDTO.getPrecio());
             ps.setFloat(6, reservaDTO.getDescuento());
             ps.setObject(7, reservaDTO instanceof ReservaBono ? ((ReservaBono) reservaDTO).getBono().getIdBono() : null);
-
             ps.executeUpdate();
 
-            // Obtener el `idReserva` generado
+            // Obtener el ID de reserva generado
             try (ResultSet rs = (ResultSet) ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     idReserva = rs.getInt(1);
                 }
             }
 
-         // Si se generó el `idReserva`, se inserta en la tabla específica según el tipo de reserva
+            // Insertar en la tabla específica según el tipo de reserva
             if (idReserva != -1) {
                 ReservaDTO reservaEspecifica = null;
                 if (reservaDTO instanceof ReservaIndividual) {
@@ -119,21 +141,14 @@ public class ReservasDAO {
 
                 if (reservaEspecifica != null) {
                     if (reservaEspecifica instanceof ReservaFamiliar) {
-                        System.out.println("Entramos aquí en ReservaFamiliar");
                         insertarReservaFamiliar(idReserva, ((ReservaFamiliar) reservaEspecifica).getNumeroAdultos(), ((ReservaFamiliar) reservaEspecifica).getNumeroNinos());
                     } else if (reservaEspecifica instanceof ReservaAdulto) {
-                        System.out.println("Entramos aquí en ReservaAdulto");
                         insertarReservaAdulto(idReserva, ((ReservaAdulto) reservaEspecifica).getNumeroAdultos());
                     } else if (reservaEspecifica instanceof ReservaInfantil) {
-                        System.out.println("Entramos aquí en ReservaInfantil");
                         insertarReservaInfantil(idReserva, ((ReservaInfantil) reservaEspecifica).getNumeroNinos());
                     }
-                } else {
-                    System.out.println("Error: Tipo de reserva específica no encontrada para idReserva " + idReserva);
                 }
             }
-
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -141,11 +156,16 @@ public class ReservasDAO {
         return idReserva;
     }
 
+    /**
+     * Obtiene un bono por su ID.
+     *
+     * @param idBono El ID del bono a obtener.
+     * @return El bono obtenido o null si no se encuentra.
+     */
     public Bono obtenerBono(int idBono) {
         Bono bono = null;
         String sql = prop.getProperty("obtenerBono");
 
-        // Verifica que la conexión esté abierta, de lo contrario, abre una nueva
         if (con == null || con.isClosed()) {
             DBConnection conexion = new DBConnection();
             con = (Connection) conexion.getConnection();
@@ -167,7 +187,13 @@ public class ReservasDAO {
 
         return bono;
     }
-    
+
+    /**
+     * Crea un nuevo bono para un jugador.
+     *
+     * @param idUsuario El ID del usuario que recibirá el bono.
+     * @return El bono creado.
+     */
     public Bono crearNuevoBono(int idUsuario) {
         Bono bono = new Bono();
         bono.setIdUsuario(idUsuario);
@@ -190,15 +216,36 @@ public class ReservasDAO {
                     bono.setIdBono(rs.getInt(1));
                 }
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
         return bono;
     }
-
-
+    
+    
+    /**
+     * Actualiza una reserva en la base de datos con nueva información, incluyendo la fecha, duración, precio, 
+     * descuento, y tipo de reserva (infantil, familiar o adulto).
+     *
+     * @param idReserva             El ID de la reserva a actualizar.
+     * @param nuevaFechaHora        La nueva fecha y hora de la reserva.
+     * @param nuevaDuracionMinutos  La nueva duración de la reserva en minutos.
+     * @param nuevoPrecio           El nuevo precio de la reserva.
+     * @param nuevoDescuento        El nuevo descuento aplicado a la reserva.
+     * @param nuevaIdPista          El ID de la nueva pista asociada a la reserva.
+     * @param numeroAdultos         El nuevo número de adultos para la reserva (solo para reservas familiares o de adultos).
+     * @param numeroNinos           El nuevo número de niños para la reserva (solo para reservas familiares o infantiles).
+     *
+     * @throws SQLException Si ocurre un error al realizar las operaciones en la base de datos.
+     *
+     * <p>La función utiliza sentencias SQL preparadas para asegurar la actualización correcta y segura de los datos.
+     * Dependiendo de los parámetros proporcionados, se actualizan las tablas correspondientes:
+     * - Si solo se especifica el número de niños, se actualiza la tabla de reservas infantiles.
+     * - Si se especifican tanto el número de adultos como de niños, se actualiza la tabla de reservas familiares.
+     * - Si solo se especifica el número de adultos, se actualiza la tabla de reservas de adultos.
+     * </p>
+     */
     public void actualizarReserva(int idReserva, Date nuevaFechaHora, int nuevaDuracionMinutos, float nuevoPrecio, float nuevoDescuento, int nuevaIdPista, Integer numeroAdultos, Integer numeroNinos) {
         String sqlActualizarReserva = prop.getProperty("actualizarReserva");
         String sqlActualizarReservaInfantil = prop.getProperty("actualizarReservaInfantil");
@@ -249,9 +296,11 @@ public class ReservasDAO {
         }
     }
 
-
-
-    
+    /**
+     * Actualiza las sesiones restantes de un bono.
+     *
+     * @param idBono El ID del bono a actualizar.
+     */
     public void actualizarSesionesBono(int idBono) {
         String sql = prop.getProperty("actualizarSesionesBono");
 
@@ -262,30 +311,33 @@ public class ReservasDAO {
             e.printStackTrace();
         }
     }
-    
+
+    /**
+     * Elimina una reserva de la base de datos.
+     *
+     * @param idReserva El ID de la reserva a eliminar.
+     */
     public void eliminarReserva(int idReserva) {
         String sqlEliminarReserva = prop.getProperty("eliminarReserva");
         DBConnection conexion = new DBConnection();
 
         try (Connection con = (Connection) conexion.getConnection()) {
-            // Eliminar la reserva en la tabla principal `Reserva`
             try (PreparedStatement ps = con.prepareStatement(sqlEliminarReserva)) {
                 ps.setInt(1, idReserva);
-                int affectedRows = ps.executeUpdate();
-                System.out.println("Eliminación en tabla Reserva: " + affectedRows + " filas afectadas.");
+                ps.executeUpdate();
             }
-
-            // Llamar al método para eliminar en las tablas específicas
             eliminarReservaEspecifica(idReserva);
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    
+    /**
+     * Elimina una reserva específica en las tablas correspondientes.
+     *
+     * @param idReserva El ID de la reserva a eliminar.
+     */
     public void eliminarReservaEspecifica(int idReserva) {
-        // Consultas SQL para eliminar la reserva en las tablas específicas
         String sqlEliminarReservaInfantil = prop.getProperty("eliminarReservaInfantil");
         String sqlEliminarReservaFamiliar = prop.getProperty("eliminarReservaFamiliar");
         String sqlEliminarReservaAdulto = prop.getProperty("eliminarReservaAdulto");
@@ -293,32 +345,22 @@ public class ReservasDAO {
         DBConnection conexion = new DBConnection();
 
         try (Connection con = (Connection) conexion.getConnection()) {
-            // Intentar eliminar en cada tabla específica. Solo una debería coincidir.
             try (PreparedStatement psInfantil = con.prepareStatement(sqlEliminarReservaInfantil)) {
                 psInfantil.setInt(1, idReserva);
-                int affectedRowsInfantil = psInfantil.executeUpdate();
-                System.out.println("Intento de eliminación en ReservaInfantil: " + affectedRowsInfantil + " filas afectadas.");
+                psInfantil.executeUpdate();
             }
-
             try (PreparedStatement psFamiliar = con.prepareStatement(sqlEliminarReservaFamiliar)) {
                 psFamiliar.setInt(1, idReserva);
-                int affectedRowsFamiliar = psFamiliar.executeUpdate();
-                System.out.println("Intento de eliminación en ReservaFamiliar: " + affectedRowsFamiliar + " filas afectadas.");
+                psFamiliar.executeUpdate();
             }
-
             try (PreparedStatement psAdulto = con.prepareStatement(sqlEliminarReservaAdulto)) {
                 psAdulto.setInt(1, idReserva);
-                int affectedRowsAdulto = psAdulto.executeUpdate();
-                System.out.println("Intento de eliminación en ReservaAdulto: " + affectedRowsAdulto + " filas afectadas.");
+                psAdulto.executeUpdate();
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
-
-
-
 
     /**
      * Realiza una reserva individual para un jugador.
@@ -374,6 +416,8 @@ public class ReservasDAO {
 
         // Aplicar el descuento calculado a la reserva
         reservaDTO.setDescuento(descuentoAntiguedad);
+
+       actualizarFechaInscripcionSiEsNecesario(jugadorDTO);
 
         // Insertar la reserva en la base de datos
         ReservasDAO reservasDAO = new ReservasDAO();
@@ -437,8 +481,14 @@ public class ReservasDAO {
                 throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
         }
 
+        // Validar si la fecha de inscripción está en estado NULL y actualizarla si es la primera reserva
+        actualizarFechaInscripcionSiEsNecesario(jugadorDTO);
+
+        // Insertar la reserva en la base de datos
         int idReserva = insertarReserva(reservaDTO);
         reservaDTO.setIdReserva(idReserva);
+
+        // Actualizar las sesiones del bono
         actualizarSesionesBono(bono.getIdBono());
     }
 
@@ -1068,5 +1118,13 @@ public class ReservasDAO {
         long MILISEGUNDOS_EN_24_HORAS = 24 * 60 * 60 * 1000;
         long diferenciaTiempo = reservaDTO.getFechaHora().getTime() - new Date().getTime();
         return diferenciaTiempo > MILISEGUNDOS_EN_24_HORAS;
+    }
+    
+    // Método que actualiza la fecha de inscripción del jugador si está en estado NULL
+    public void actualizarFechaInscripcionSiEsNecesario(JugadorDTO jugadorDTO) {
+        if (jugadorDTO.getFechaInscripcion() == null) {
+            JugadoresDAO jugadoresDAO = new JugadoresDAO();
+            jugadoresDAO.actualizarFechaInscripcion(jugadorDTO.getCorreoElectronico());
+        }
     }
 }

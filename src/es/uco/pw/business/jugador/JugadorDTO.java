@@ -19,7 +19,7 @@ public class JugadorDTO {
     private Date fechaInscripcion;
     private String correoElectronico;
     private boolean cuentaActiva = true; // Campo para indicar si la cuenta está activa
-    
+
     /**
      * Constructor vacío. Asigna un ID único y activa la cuenta por defecto.
      */
@@ -27,7 +27,7 @@ public class JugadorDTO {
         this.idJugador = idCounter++; // Asignar un ID único y aumentar el contador
         this.cuentaActiva = true; // La cuenta es activa por defecto
     }
-    
+
     /**
      * Constructor parametrizado que permite definir nombre, fecha de nacimiento y correo electrónico.
      *
@@ -41,7 +41,7 @@ public class JugadorDTO {
         this.fechaNacimiento = fechaNacimiento;
         this.correoElectronico = correoElectronico;
     }
-    
+
     // Métodos getter y setter
 
     /**
@@ -179,14 +179,14 @@ public class JugadorDTO {
         Calendar fechaActual = Calendar.getInstance();
         Calendar fechaInscripcionCal = Calendar.getInstance();
         fechaInscripcionCal.setTime(fechaInscripcion);
-        
+
         int aniosAntiguedad = fechaActual.get(Calendar.YEAR) - fechaInscripcionCal.get(Calendar.YEAR);
-        
+
         // Si aún no ha pasado la fecha de inscripción en este año, restamos 1
         if (fechaActual.get(Calendar.DAY_OF_YEAR) < fechaInscripcionCal.get(Calendar.DAY_OF_YEAR)) {
             aniosAntiguedad--;
         }
-        
+
         return aniosAntiguedad;
     }
 }

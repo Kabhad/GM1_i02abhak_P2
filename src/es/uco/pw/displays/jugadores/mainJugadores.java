@@ -4,17 +4,16 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Scanner;
-
 import es.uco.pw.business.jugador.JugadorDTO;
 import es.uco.pw.data.dao.JugadoresDAO;
 
 /**
  * Clase principal que implementa un menú de gestión de jugadores.
  * Permite realizar operaciones como alta, modificación, baja y listado de jugadores
- * mediante el uso de la clase GestorJugadores.
+ * mediante el uso de la clase JugadoresDAO.
  */
 public class mainJugadores {
-    
+
     /**
      * Imprime el menú principal de opciones para la gestión de jugadores.
      */
@@ -25,7 +24,7 @@ public class mainJugadores {
         System.out.println("1. Alta de Usuario");
         System.out.println("2. Modificar Usuario");
         System.out.println("3. Listar Usuarios");
-        System.out.println("4. Baja de Usuario"); 
+        System.out.println("4. Baja de Usuario");
         System.out.println("0. Volver al menú principal");
         System.out.println("=====================================");
         System.out.print("Seleccione una opción: ");
@@ -38,7 +37,7 @@ public class mainJugadores {
      * @param sc El objeto Scanner utilizado para leer las entradas del usuario.
      */
     public static void main(Scanner sc) {
-    	JugadoresDAO gestor = new JugadoresDAO();
+        JugadoresDAO gestor = new JugadoresDAO();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         int opcion;
 
@@ -105,9 +104,9 @@ public class mainJugadores {
                     String resultadoListado = gestor.listarJugadores();
                     System.out.println(resultadoListado);
                     break;
-                    
+
                 case 4: // Baja de jugador
-                	System.out.println("Iniciando proceso de baja de jugador...");
+                    System.out.println("Iniciando proceso de baja de jugador...");
                     System.out.print("Ingrese el correo electrónico del jugador a dar de baja: ");
                     String correoBaja = sc.nextLine();
 
@@ -115,7 +114,7 @@ public class mainJugadores {
                     String resultadoBaja = gestor.bajaJugador(correoBaja);
                     System.out.println(resultadoBaja);
                     break;
-                	
+
                 case 0: // Salir
                     System.out.println("Volviendo al menú principal...");
                     break;
