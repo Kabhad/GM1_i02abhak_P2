@@ -12,7 +12,6 @@ import java.util.Date;
 public class JugadorDTO {
 
     // Atributos
-    private static int idCounter = 1; // Contador estático para generar IDs únicos
     private int idJugador;
     private String nombreApellidos;
     private Date fechaNacimiento;
@@ -24,7 +23,6 @@ public class JugadorDTO {
      * Constructor vacío. Asigna un ID único y activa la cuenta por defecto.
      */
     public JugadorDTO() {
-        this.idJugador = idCounter++; // Asignar un ID único y aumentar el contador
         this.cuentaActiva = true; // La cuenta es activa por defecto
     }
 

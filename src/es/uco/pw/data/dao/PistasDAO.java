@@ -445,67 +445,72 @@ public class PistasDAO {
      * @throws IllegalArgumentException Si el tipo de reserva no es válido.
      */
     public List<PistaDTO> listarPistasDisponibles(String tipoReserva) throws SQLException {
-        List<PistaDTO> pistasFiltradas = new ArrayList<>();
-        Map<Integer, PistaDTO> mapaPistas = new HashMap<>();
-        String tipoPista;
-        switch (tipoReserva.toLowerCase()) {
-            case "infantil":
-                tipoPista = "MINIBASKET";
-                break;
-            case "familiar":
-                tipoPista = "MINIBASKET'; OR tamanoPista = '3VS3";
-                break;
-            case "adulto":
-                tipoPista = "ADULTOS";
-                break;
-            default:
-                throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
-        }
+        List<PistaDTO> pistas = new ArrayList<>();
         DBConnection conexion = new DBConnection();
-        this.con = conexion.getConnection();
-        if (this.con == null || this.prop == null) {
-            System.err.println("Error: No se pudo obtener la conexión o las propiedades 'prop' no están inicializadas.");
-            return pistasFiltradas;
-        }
-        String sql = this.prop.getProperty("buscarPistasDisponiblesPorTipo");
+        con = (Connection) conexion.getConnection();
+        
+        String sql = prop.getProperty("listarPistasDisponibles");
         if (sql == null || sql.isEmpty()) {
-            System.err.println("Error: La consulta SQL para 'buscarPistasDisponibles' no está definida o está vacía.");
-            return pistasFiltradas;
+            System.err.println("Error: La consulta SQL para 'listarPistasDisponibles' no está definida o está vacía.");
+            return pistas;
         }
-        try (PreparedStatement ps = this.con.prepareStatement(sql)) {
-            ps.setString(1, tipoPista);
+        
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            // Configurar el tipo de pista según el tipo de reserva
+            switch (tipoReserva.toLowerCase()) {
+                case "infantil":
+                    ps.setString(1, "MINIBASKET");
+                    ps.setString(2, "MINIBASKET"); // Para mantener la consulta con dos parámetros
+                    break;
+                case "familiar":
+                    ps.setString(1, "MINIBASKET");
+                    ps.setString(2, "_3VS3");
+                    break;
+                case "adulto":
+                    ps.setString(1, "ADULTOS");
+                    ps.setString(2, "ADULTOS"); // Para mantener la consulta con dos parámetros
+                    break;
+                default:
+                    throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
+            }
+
             try (ResultSet rs = ps.executeQuery()) {
+                Map<Integer, PistaDTO> mapaPistas = new HashMap<>();
                 while (rs.next()) {
                     int idPista = rs.getInt("idPista");
                     if (!mapaPistas.containsKey(idPista)) {
                         PistaDTO pista = new PistaDTO(
+                            idPista,
                             rs.getString("nombre"),
                             rs.getBoolean("disponible"),
                             rs.getBoolean("exterior"),
                             TamanoPista.valueOf(rs.getString("tamanoPista")),
                             rs.getInt("maxJugadores")
                         );
-                        pista.setIdPista(idPista);
                         mapaPistas.put(idPista, pista);
                     }
                     PistaDTO pista = mapaPistas.get(idPista);
                     int idMaterial = rs.getInt("idMaterial");
                     if (idMaterial != 0) {
-                        TipoMaterial tipo = TipoMaterial.valueOf(rs.getString("tipoMaterial"));
-                        boolean usoExterior = rs.getBoolean("usoExterior");
+                        TipoMaterial tipo = TipoMaterial.valueOf(rs.getString("tipo"));
                         EstadoMaterial estado = EstadoMaterial.valueOf(rs.getString("estado"));
-                        MaterialDTO material = new MaterialDTO(idMaterial, tipo, usoExterior, estado);
+                        MaterialDTO material = new MaterialDTO(
+                            idMaterial,
+                            tipo,
+                            rs.getBoolean("usoExterior"),
+                            estado
+                        );
                         pista.getMateriales().add(material);
                     }
                 }
+                pistas.addAll(mapaPistas.values());
             }
         } catch (SQLException e) {
-            System.err.println("Error al ejecutar la consulta de pistas disponibles.");
             e.printStackTrace();
         }
-        pistasFiltradas.addAll(mapaPistas.values());
-        return pistasFiltradas;
+        return pistas;
     }
+
 
     /**
      * Método para listar todas las pistas con sus detalles.

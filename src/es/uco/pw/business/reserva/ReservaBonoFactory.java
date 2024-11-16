@@ -6,7 +6,6 @@ public class ReservaBonoFactory extends ReservaFactory {
 
     @Override
     public ReservaDTO crearReservaInfantil(int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroNinos, Bono bono, int numeroSesion) {
-        validarBono(bono);
         ReservaBono reservaBase = new ReservaBono(idUsuario, fechaHora, duracionMinutos, idPista, bono, numeroSesion);
         ReservaDTO reservaEspecifica = new ReservaInfantil(idUsuario, fechaHora, duracionMinutos, idPista, numeroNinos);
         reservaBase.setReservaEspecifica(reservaEspecifica);
@@ -15,7 +14,6 @@ public class ReservaBonoFactory extends ReservaFactory {
 
     @Override
     public ReservaDTO crearReservaFamiliar(int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroAdultos, int numeroNinos, Bono bono, int numeroSesion) {
-        validarBono(bono);
         ReservaBono reservaBase = new ReservaBono(idUsuario, fechaHora, duracionMinutos, idPista, bono, numeroSesion);
         ReservaDTO reservaEspecifica = new ReservaFamiliar(idUsuario, fechaHora, duracionMinutos, idPista, numeroAdultos, numeroNinos);
         reservaBase.setReservaEspecifica(reservaEspecifica);
@@ -24,7 +22,6 @@ public class ReservaBonoFactory extends ReservaFactory {
 
     @Override
     public ReservaDTO crearReservaAdulto(int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroAdultos, Bono bono, int numeroSesion) {
-        validarBono(bono);
         ReservaBono reservaBase = new ReservaBono(idUsuario, fechaHora, duracionMinutos, idPista, bono, numeroSesion);
         ReservaDTO reservaEspecifica = new ReservaAdulto(idUsuario, fechaHora, duracionMinutos, idPista, numeroAdultos);
         reservaBase.setReservaEspecifica(reservaEspecifica);

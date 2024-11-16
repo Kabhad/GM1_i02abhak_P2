@@ -5,6 +5,7 @@ import es.uco.pw.business.pista.PistaDTO;
 import es.uco.pw.business.reserva.*;
 import es.uco.pw.data.dao.ReservasDAO;
 
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -41,8 +42,9 @@ public class mainReservas {
      * Método principal que inicia el gestor de reservas.
      * 
      * @param sc Scanner para la entrada del usuario.
+     * @throws SQLException 
      */
-    public static void main(Scanner sc, ReservasDAO reservasDAO) {
+    public static void main(Scanner sc, ReservasDAO reservasDAO) throws SQLException {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         int opcion;
         boolean continuar = true;
@@ -64,11 +66,9 @@ public class mainReservas {
                         break;
                     }
 
-                    // Solicitar el tipo de reserva
                     System.out.print("Ingrese el tipo de reserva (infantil, familiar, adulto): ");
                     String tipoReserva = sc.nextLine().toLowerCase();
 
-                    // Listar pistas disponibles basadas en el tipo de reserva
                     List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles(tipoReserva);
                     if (pistasDisponibles.isEmpty()) {
                         System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReserva + "'.");
@@ -99,7 +99,6 @@ public class mainReservas {
                     int numeroAdultos = 0;
                     int numeroNinos = 0;
 
-                    // Solicitar número de adultos y/o niños según el tipo de reserva
                     if (tipoReserva.equals("familiar") || tipoReserva.equals("adulto")) {
                         System.out.print("Ingrese número de adultos: ");
                         numeroAdultos = sc.nextInt();
@@ -112,10 +111,17 @@ public class mainReservas {
                     }
 
                     try {
+                        // Crear la reserva
                         int idReserva = reservasDAO.hacerReservaIndividual(jugadorDTO, fechaHora, duracionMinutos, pistaDTO, numeroAdultos, numeroNinos);
+
+                        // Mostrar detalles de la reserva
                         System.out.println("Reserva individual creada correctamente con ID: " + idReserva);
+                        ReservaDTO reserva = reservasDAO.obtenerReservaPorId(idReserva); // Necesitas este método para obtener la reserva
+                        if (reserva != null) {
+                            System.out.println(reserva.toString());
+                        }
                     } catch (IllegalArgumentException e) {
-                        System.out.println("Error al crear la reserva: " + e.getMessage()); // Muestra mensajes de error como "Fecha pasada" o "Menos de 6 horas de antelación"
+                        System.out.println("Error al crear la reserva: " + e.getMessage());
                     }
                 } catch (ParseException e) {
                     System.out.println("Formato de fecha incorrecto.");
@@ -177,40 +183,39 @@ public class mainReservas {
                         sc.nextLine(); // Limpiar buffer
                     }
 
-                    System.out.print("Ingrese ID del bono: ");
-                    int idBono = sc.nextInt();
-                    sc.nextLine(); // Limpiar buffer
-
-                    Bono bono = reservasDAO.obtenerBono(idBono);
-                    if (bono == null) {
-                        System.out.println("Bono no encontrado. ¿Desea crear un nuevo bono? (S/N)");
-                        String respuesta = sc.nextLine();
-                        if (respuesta.equalsIgnoreCase("S")) {
-                            bono = reservasDAO.crearNuevoBono(jugadorBono.getIdJugador());  // Implementar `crearNuevoBono` en `ReservasDAO`
-                            System.out.println("Nuevo bono creado con ID: " + bono.getIdBono());
-                        } else {
-                            System.out.println("Operación cancelada.");
-                            return;
-                        }
-                    }
-
-                    if (bono.getSesionesRestantes() <= 0) {
-                        System.out.println("El bono no tiene sesiones disponibles.");
-                        break;
-                    }
-
-                    int numeroSesion = 5 - bono.getSesionesRestantes();
-
+                    boolean reservaConBonoExitosa = false;
                     try {
-                        reservasDAO.hacerReservaBono(jugadorBono, fechaHoraBono, duracionMinutosBono, pistaBono, numeroAdultosBono, numeroNinosBono, bono, numeroSesion);
-                        System.out.println("Reserva de bono creada correctamente.");
-                    } catch (IllegalArgumentException e) {
-                        System.out.println("Error al crear la reserva de bono: " + e.getMessage());
+                        // Intentar hacer la reserva con bono
+                        reservaConBonoExitosa = reservasDAO.hacerReservaBono(jugadorBono, fechaHoraBono, duracionMinutosBono, pistaBono, numeroAdultosBono, numeroNinosBono);
+
+                        // Mostrar detalles de la reserva si fue exitosa
+                        if (reservaConBonoExitosa) {
+                            // Obtener el Bono del jugador
+                            Bono bono = reservasDAO.obtenerBonoPorJugador(jugadorBono.getIdJugador());
+                            if (bono != null) {
+                                // Usar el idReserva y el idBono para obtener la reserva con bono
+                                ReservaDTO reserva = reservasDAO.obtenerReservaPorIdBono(jugadorBono.getIdJugador(), bono);
+                                if (reserva != null) {
+                                    System.out.println("Reserva de bono creada correctamente:");
+                                    System.out.println(reserva.toString());
+                                } else {
+                                    System.out.println("No se encontró la reserva creada.");
+                                }
+                            } else {
+                                System.out.println("Error: No se pudo obtener el bono del jugador.");
+                            }
+                        } else {
+                            System.out.println("Error: No se pudo crear la reserva de bono.");
+                        }
+                    } catch (SQLException e) {
+                        System.out.println("Error en la base de datos: " + e.getMessage());
                     }
+
                 } catch (ParseException e) {
                     System.out.println("Formato de fecha incorrecto.");
                 }
                 break;
+
 
 
                 

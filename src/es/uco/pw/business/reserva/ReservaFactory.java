@@ -14,13 +14,4 @@ public abstract class ReservaFactory {
     public abstract ReservaDTO crearReservaFamiliar(int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroAdultos, int numeroNinos, Bono bono, int numeroSesion);
     public abstract ReservaDTO crearReservaAdulto(int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroAdultos, Bono bono, int numeroSesion);
 
-    // Método de validación de bonos
-    protected void validarBono(Bono bono) {
-        if (bono.estaCaducado()) {
-            throw new IllegalArgumentException("El bono ha caducado y no puede ser utilizado para esta reserva.");
-        }
-        if (bono.getSesionesRestantes() <= 0) {
-            throw new IllegalStateException("El bono no tiene sesiones restantes disponibles.");
-        }
-    }
 }
