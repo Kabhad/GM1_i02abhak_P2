@@ -100,6 +100,16 @@ public class ReservasDAO {
         }
     }
     
+    /**
+     * Inserta una reserva específica en la base de datos según su tipo.
+     *
+     * @param tipoReserva   El tipo de reserva (familiar, adulto o infantil).
+     * @param idReserva     El ID de la reserva.
+     * @param numeroAdultos El número de adultos en la reserva (opcional).
+     * @param numeroNinos   El número de niños en la reserva (opcional).
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     * @throws IllegalArgumentException Si el tipo de reserva no es válido.
+     */
     public void insertarReservaEspecifica(String tipoReserva, int idReserva, Integer numeroAdultos, Integer numeroNinos) throws SQLException {
         if (con == null || con.isClosed()) {
             DBConnection conexion = new DBConnection();
@@ -293,16 +303,21 @@ public class ReservasDAO {
         String sqlActualizarReservaAdulto = prop.getProperty("actualizarReservaAdulto");
 
         DBConnection conexion = new DBConnection();
-        try (Connection con = (Connection) conexion.getConnection()) {  // Usa try-with-resources para asegurar el cierre de la conexión
+        try (Connection con = (Connection) conexion.getConnection()) {  // Usa try-with-resources para cerrar automáticamente la conexión
 
             // Actualizar la tabla principal `Reserva`
             try (PreparedStatement ps = con.prepareStatement(sqlActualizarReserva)) {
-                ps.setTimestamp(1, new java.sql.Timestamp(nuevaFechaHora.getTime()));
-                ps.setInt(2, nuevaDuracionMinutos);
-                ps.setFloat(3, nuevoPrecio);
-                ps.setFloat(4, nuevoDescuento);
-                ps.setInt(5, nuevaIdPista);
-                ps.setInt(6, idReserva);
+                ps.setTimestamp(1, new java.sql.Timestamp(nuevaFechaHora.getTime()));  // Fecha y hora
+                ps.setInt(2, nuevaDuracionMinutos);  // Duración
+                ps.setFloat(3, nuevoPrecio);  // Precio
+                ps.setFloat(4, nuevoDescuento);  // Descuento
+                ps.setInt(5, nuevaIdPista);  // Pista
+                ps.setInt(6, idReserva);  // ID de reserva
+
+                int filasActualizadas = ps.executeUpdate();
+                if (filasActualizadas == 0) {
+                    throw new IllegalStateException("No se pudo actualizar la reserva principal con ID: " + idReserva);
+                }
             }
 
             // Actualizar tabla específica según el tipo de reserva
@@ -310,23 +325,28 @@ public class ReservasDAO {
                 try (PreparedStatement psInfantil = con.prepareStatement(sqlActualizarReservaInfantil)) {
                     psInfantil.setInt(1, numeroNinos);
                     psInfantil.setInt(2, idReserva);
+                    psInfantil.executeUpdate();
                 }
             } else if (numeroNinos != null && numeroAdultos != null) {  // Familiar
                 try (PreparedStatement psFamiliar = con.prepareStatement(sqlActualizarReservaFamiliar)) {
                     psFamiliar.setInt(1, numeroAdultos);
                     psFamiliar.setInt(2, numeroNinos);
                     psFamiliar.setInt(3, idReserva);
+                    psFamiliar.executeUpdate();
                 }
             } else if (numeroAdultos != null && numeroNinos == null) {  // Adulto
                 try (PreparedStatement psAdulto = con.prepareStatement(sqlActualizarReservaAdulto)) {
                     psAdulto.setInt(1, numeroAdultos);
                     psAdulto.setInt(2, idReserva);
+                    psAdulto.executeUpdate();
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            throw new IllegalStateException("Error al actualizar la reserva: " + e.getMessage(), e);
         }
     }
+
 
     /**
      * Actualiza las sesiones restantes de un bono.
@@ -343,6 +363,25 @@ public class ReservasDAO {
             e.printStackTrace();
         }
     }
+    
+    /**
+     * Decrementa las sesiones utilizadas de un bono.
+     *
+     * @param idBono El ID del bono a actualizar.
+     */
+    public void decrementarSesionesBono(int idBono) {
+        String sql = prop.getProperty("actualizarSesionesBonoDecrementar");
+
+        DBConnection conexion = new DBConnection();
+        try (Connection con = (Connection) conexion.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idBono);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     /**
      * Elimina una reserva de la base de datos.
@@ -506,11 +545,6 @@ public class ReservasDAO {
         return true;
     }
 
-
-
-
-
-
     /**
      * Modifica una reserva existente.
      *
@@ -628,6 +662,10 @@ public class ReservasDAO {
 
         // Eliminar la reserva de la base de datos
         reservasDAO.eliminarReserva(reservaDTO.getIdReserva());
+        if (reservaDTO instanceof ReservaBono) {
+            ReservaBono reservaBono = (ReservaBono) reservaDTO;
+            decrementarSesionesBono(reservaBono.getBono().getIdBono());
+        }
     }
 
     /**
@@ -863,7 +901,9 @@ public class ReservasDAO {
      * Obtiene una reserva completa usando el patrón Factory.
      *
      * @param idReserva El ID de la reserva.
-     * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto).
+     * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto),
+     *         o null si no se encuentra la reserva.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
      */
     public ReservaDTO obtenerReservaCompleta(int idReserva) {
         String sqlBaseReserva = prop.getProperty("buscarReservaBase");
@@ -963,7 +1003,9 @@ public class ReservasDAO {
      * @param idJugador El ID del jugador.
      * @param idPista El ID de la pista.
      * @param fechaHora La fecha y hora de la reserva.
-     * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto).
+     * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto),
+     *         o null si no se encuentra la reserva.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
      */
     public ReservaDTO encontrarReserva(int idJugador, int idPista, Date fechaHora) {
         ReservaDTO reservaDTO = null;
@@ -1060,9 +1102,6 @@ public class ReservasDAO {
         return reservaDTO;
     }
 
-
-
-
     /**
      * Verifica si la pista cumple las condiciones para el tipo de reserva.
      *
@@ -1085,10 +1124,10 @@ public class ReservasDAO {
 
     /**
      * Determina el tipo de reserva según el número de adultos y niños.
-     * 
+     *
      * @param numeroAdultos El número de adultos.
      * @param numeroNinos El número de niños.
-     * @return El tipo de reserva.
+     * @return El tipo de reserva: "familiar", "adulto" o "infantil".
      * @throws IllegalArgumentException Si no se puede determinar el tipo de reserva.
      */
     public String determinarTipoReserva(int numeroAdultos, int numeroNinos) {
@@ -1135,7 +1174,7 @@ public class ReservasDAO {
     
     /**
      * Valida que el número de jugadores no exceda el máximo permitido para la pista.
-     * 
+     *
      * @param pistaDTO La pista a reservar.
      * @param numeroAdultos El número de adultos en la reserva.
      * @param numeroNinos El número de niños en la reserva.
@@ -1207,7 +1246,11 @@ public class ReservasDAO {
         return diferenciaTiempo > MILISEGUNDOS_EN_24_HORAS;
     }
     
-    // Método que actualiza la fecha de inscripción del jugador si está en estado NULL
+    /**
+     * Actualiza la fecha de inscripción del jugador si está en estado NULL.
+     *
+     * @param jugadorDTO El jugador cuyo estado de inscripción será actualizado.
+     */
     public void actualizarFechaInscripcionSiEsNecesario(JugadorDTO jugadorDTO) {
         if (jugadorDTO.getFechaInscripcion() == null) {
             JugadoresDAO jugadoresDAO = new JugadoresDAO();
@@ -1215,6 +1258,13 @@ public class ReservasDAO {
         }
     }
     
+    /**
+     * Obtiene un bono asociado a un jugador por su ID.
+     *
+     * @param idJugador El ID del jugador.
+     * @return El bono asociado, o null si no se encuentra.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     */
     public Bono obtenerBonoPorJugador(int idJugador) throws SQLException {
         Bono bono = null;
         String sql = prop.getProperty("obtenerBonoPorJugador"); // Define esta consulta en `sql.properties`
@@ -1251,6 +1301,13 @@ public class ReservasDAO {
         return bono;
     }
     
+    /**
+     * Obtiene una reserva por su ID.
+     *
+     * @param idReserva El ID de la reserva a buscar.
+     * @return La instancia de ReservaDTO encontrada, o null si no existe.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     */
     public ReservaDTO obtenerReservaPorId(int idReserva) throws SQLException {
         ReservaDTO reservaDTO = null;
         String sqlBaseReserva = prop.getProperty("buscarReservaPorId"); // Define esta consulta en `sql.properties`
@@ -1283,7 +1340,15 @@ public class ReservasDAO {
 
         return reservaDTO;
     }
-
+    
+    /**
+     * Obtiene una reserva asociada a un bono y un usuario.
+     *
+     * @param idUsuario El ID del usuario.
+     * @param bono El bono asociado.
+     * @return La reserva encontrada, o null si no existe.
+     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
+     */
     public ReservaDTO obtenerReservaPorIdBono(int idUsuario, Bono bono) {
         ReservaDTO reservaDTO = null;
         String sqlBaseReserva = prop.getProperty("encontrarReservaPorIdBono");
