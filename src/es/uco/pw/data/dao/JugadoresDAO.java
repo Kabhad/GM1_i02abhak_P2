@@ -13,7 +13,7 @@ import es.uco.pw.data.common.DBConnection;
 
 /**
  * Clase que gestiona los jugadores registrados en el sistema. Permite operaciones como
- * alta, baja, modificación, y almacenamiento de jugadores en un archivo CSV.
+ * alta, baja, modificación, y almacenamiento de jugadores.
  * Implementa el patrón Singleton para garantizar una única instancia del gestor.
  */
 public class JugadoresDAO {
