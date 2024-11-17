@@ -11,13 +11,41 @@ import es.uco.pw.business.material.*;
  */
 public class PistaDTO {
 
-    private int idPista;
-    private String nombrePista;
-    private boolean disponible;
-    private boolean exterior;
-    private TamanoPista pista;
-    private int max_jugadores;
-    private List<MaterialDTO> materiales;
+	/**
+	 * Identificador único de la pista.
+	 */
+	private int idPista;
+
+	/**
+	 * Nombre de la pista.
+	 */
+	private String nombrePista;
+
+	/**
+	 * Indica si la pista está disponible para reservas.
+	 */
+	private boolean disponible;
+
+	/**
+	 * Indica si la pista es de tipo exterior.
+	 */
+	private boolean exterior;
+
+	/**
+	 * Tamaño de la pista (pequeña, mediana, grande).
+	 */
+	private TamanoPista pista;
+
+	/**
+	 * Número máximo de jugadores permitidos en la pista.
+	 */
+	private int max_jugadores;
+
+	/**
+	 * Lista de materiales asociados a la pista.
+	 */
+	private List<MaterialDTO> materiales;
+
 
     /**
      * Constructor vacío que inicializa una pista con un ID único y una lista vacía de materiales.
@@ -65,9 +93,9 @@ public class PistaDTO {
     }
 
     /**
-     * Obtiene el ID único de la pista.
+     * Obtiene el identificador único de la pista.
      *
-     * @return ID de la pista.
+     * @return El identificador de la pista.
      */
     public int getIdPista() {
         return idPista;
@@ -225,6 +253,9 @@ public class PistaDTO {
      * Excepción personalizada para indicar incompatibilidad de material con la pista.
      */
     public static class MaterialIncompatibleException extends Exception {
+    	/**
+    	 * Identificador para la serialización de la clase.
+    	 */
         private static final long serialVersionUID = 1L;
 
         /**
@@ -241,6 +272,9 @@ public class PistaDTO {
      * Excepción personalizada para indicar que se ha alcanzado el máximo de materiales.
      */
     public static class MaximoMaterialException extends Exception {
+    	/**
+    	 * Identificador para la serialización de la clase.
+    	 */
         private static final long serialVersionUID = 1L;
 
         /**

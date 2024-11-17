@@ -1,6 +1,6 @@
 package es.uco.pw.data.dao;
 
-import com.mysql.jdbc.Connection;
+
 import es.uco.pw.business.material.EstadoMaterial;
 import es.uco.pw.business.material.MaterialDTO;
 import es.uco.pw.business.material.TipoMaterial;
@@ -9,9 +9,7 @@ import es.uco.pw.business.pista.TamanoPista;
 import es.uco.pw.data.common.DBConnection;
 import java.util.*;
 import java.io.*;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 
 /**
  * Clase que gestiona las pistas y materiales del sistema.
@@ -19,8 +17,16 @@ import java.sql.SQLException;
  */
 public class PistasDAO {
 
+	
+	/**
+	 * Conexión actual con la base de datos.
+	 */
     private java.sql.Connection con;
-    private Properties prop;
+
+	/**
+	 * Propiedades con las consultas SQL necesarias para el funcionamiento del DAO.
+	 */
+	private Properties prop;
 
     /**
      * Constructor privado para evitar la instanciación directa.
@@ -107,6 +113,9 @@ public class PistasDAO {
      * Excepción personalizada para indicar que un elemento no fue encontrado.
      */
     public class ElementoNoEncontradoException extends Exception {
+    	/**
+    	 * Identificador para la serialización de la clase.
+    	 */
         private static final long serialVersionUID = 1L;
 
         /**
@@ -123,6 +132,9 @@ public class PistasDAO {
      * Excepción personalizada para errores en la asociación de materiales.
      */
     public class AsociacionMaterialException extends Exception {
+    	/**
+    	 * Identificador para la serialización de la clase.
+    	 */
         private static final long serialVersionUID = 1L;
 
         /**

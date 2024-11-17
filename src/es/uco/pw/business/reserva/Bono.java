@@ -8,9 +8,24 @@ import java.util.Calendar;
  * Cada bono permite un número limitado de sesiones y tiene una fecha de caducidad.
  */
 public class Bono {
+    /**
+     * Identificador único del bono.
+     */
     private int idBono;
+
+    /**
+     * Identificador del usuario asociado al bono.
+     */
     private int idUsuario;
+
+    /**
+     * Número de sesiones restantes en el bono. Comienza con 5 sesiones.
+     */
     private int sesionesRestantes = 5; // Comienza con 5 sesiones
+
+    /**
+     * Fecha de caducidad del bono, que es un año desde la fecha de la primera reserva.
+     */
     private Date fechaCaducidad; // Un año desde la primera reserva
 
     /** 

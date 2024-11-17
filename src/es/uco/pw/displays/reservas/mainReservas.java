@@ -43,7 +43,8 @@ public class mainReservas {
      * Método principal que inicia el gestor de reservas.
      * 
      * @param sc Scanner para la entrada del usuario.
-     * @throws SQLException 
+     * @param reservasDAO para invocar a métodos del DAO.
+     * @throws SQLException en caso de errores en la Base de Datos.
      */
     public static void main(Scanner sc, ReservasDAO reservasDAO) throws SQLException {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");

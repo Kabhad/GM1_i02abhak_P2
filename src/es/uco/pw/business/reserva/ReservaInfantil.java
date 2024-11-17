@@ -7,7 +7,9 @@ import java.util.Date;
  * específica para un grupo de niños. Hereda de la clase abstracta {@code Reserva}.
  */
 public class ReservaInfantil extends ReservaDTO {
-    // Atributo específico de ReservaInfantil
+	/**
+	 * Número de infantes incluidos en la reserva infantil.
+	 */
     private int numeroNinos;
 
     /**

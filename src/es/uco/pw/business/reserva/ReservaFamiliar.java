@@ -7,35 +7,72 @@ import java.util.Date;
  * Extiende la clase abstracta Reserva, añadiendo atributos específicos para reservas familiares.
  */
 public class ReservaFamiliar extends ReservaDTO {
-    // Atributos específicos de ReservaFamiliar
-    private int numeroAdultos;
-    private int numeroNinos;
+	/**
+	 * Número de adultos incluidos en la reserva familiar.
+	 */
+	private int numeroAdultos;
 
-    // Constructor vacío, llama al constructor vacío de Reserva, la clase padre
-    public ReservaFamiliar() {
+	/**
+	 * Número de niños incluidos en la reserva familiar.
+	 */
+	private int numeroNinos;
+
+
+	/**
+	 * Constructor vacío de la clase `ReservaFamiliar`.
+	 * Llama al constructor vacío de la clase padre `ReservaDTO`.
+	 */    public ReservaFamiliar() {
         super();
     }
 
-    // Constructor parametrizado
+	 /**
+	  * Constructor parametrizado de la clase `ReservaFamiliar`.
+	  * 
+	  * @param idUsuario       El identificador del usuario que realiza la reserva.
+	  * @param fechaHora       La fecha y hora de la reserva.
+	  * @param duracionMinutos La duración de la reserva en minutos.
+	  * @param idPista         El identificador de la pista reservada.
+	  * @param numeroAdultos   El número de adultos incluidos en la reserva.
+	  * @param numeroNinos     El número de niños incluidos en la reserva.
+	  */
     public ReservaFamiliar(int idUsuario, Date fechaHora, int duracionMinutos, int idPista, int numeroAdultos, int numeroNinos) {
         super(idUsuario, fechaHora, duracionMinutos, idPista);
         this.numeroAdultos = numeroAdultos;
         this.numeroNinos = numeroNinos;
     }
 
-    // Métodos get y set para numeroAdultos y numeroNinos
+    /**
+     * Obtiene el número de adultos incluidos en la reserva familiar.
+     * 
+     * @return El número de adultos en la reserva.
+     */
     public int getNumeroAdultos() {
         return numeroAdultos;
     }
 
+    /**
+     * Establece el número de adultos incluidos en la reserva familiar.
+     * 
+     * @param numeroAdultos El nuevo número de adultos en la reserva.
+     */
     public void setNumeroAdultos(int numeroAdultos) {
         this.numeroAdultos = numeroAdultos;
     }
 
+    /**
+     * Obtiene el número de niños incluidos en la reserva familiar.
+     * 
+     * @return El número de niños en la reserva.
+     */
     public int getNumeroNinos() {
         return numeroNinos;
     }
 
+    /**
+     * Establece el número de niños incluidos en la reserva familiar.
+     * 
+     * @param numeroNinos El nuevo número de niños en la reserva.
+     */
     public void setNumeroNinos(int numeroNinos) {
         this.numeroNinos = numeroNinos;
     }

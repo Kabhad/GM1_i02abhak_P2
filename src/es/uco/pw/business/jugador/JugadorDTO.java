@@ -12,13 +12,38 @@ import java.util.Date;
 public class JugadorDTO {
 
     // Atributos
-    private int idJugador;
-    private String nombreApellidos;
-    private Date fechaNacimiento;
-    private Date fechaInscripcion;
-    private String correoElectronico;
-    private boolean cuentaActiva = true; // Campo para indicar si la cuenta está activa
 
+    /**
+     * ID único del jugador.
+     */
+    private int idJugador;
+
+    /**
+     * Nombre y apellidos del jugador.
+     */
+    private String nombreApellidos;
+
+    /**
+     * Fecha de nacimiento del jugador.
+     */
+    private Date fechaNacimiento;
+
+    /**
+     * Fecha de inscripción del jugador en el sistema. 
+     * Puede ser null si el jugador no está inscrito.
+     */
+    private Date fechaInscripcion;
+
+    /**
+     * Correo electrónico del jugador.
+     */
+    private String correoElectronico;
+
+    /**
+     * Indica si la cuenta del jugador está activa. 
+     * Por defecto, es true.
+     */
+    private boolean cuentaActiva = true; // Campo para indicar si la cuenta está activa
     /**
      * Constructor vacío. Asigna un ID único y activa la cuenta por defecto.
      */

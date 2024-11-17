@@ -2,14 +2,12 @@ package es.uco.pw.data.dao;
 
 import java.util.Date;
 import java.io.*;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.Properties;
-import com.mysql.jdbc.Connection;
-import com.mysql.jdbc.PreparedStatement;
-import es.uco.pw.business.jugador.JugadorDTO;
 import es.uco.pw.data.common.DBConnection;
+import es.uco.pw.business.jugador.JugadorDTO;
+
 
 /**
  * Clase que gestiona los jugadores registrados en el sistema. Permite operaciones como
@@ -18,11 +16,17 @@ import es.uco.pw.data.common.DBConnection;
  */
 public class JugadoresDAO {
 
+    /**
+     * Conexión activa con la base de datos.
+     */
     private Connection con;
+    /**
+     * Propiedades que contienen las consultas SQL cargadas desde el archivo `sql.properties`.
+     */
     private Properties prop;
 
     /**
-     * Constructor que carga las propiedades SQL desde un archivo.
+     * Constructor que carga las propiedades SQL desde el archivo `sql.properties`.
      */
     public JugadoresDAO() {
         prop = new Properties();
@@ -308,6 +312,12 @@ public class JugadoresDAO {
         return null;
     }
     
+	/**
+	 * Actualiza la fecha de inscripción de un jugador en la base de datos.
+	 *
+	 * @param correoElectronico El correo del jugador cuya fecha de inscripción se actualizará.
+	 * @return Mensaje indicando el resultado de la operación.
+	 */
     public String actualizarFechaInscripcion(String correoElectronico) {
         DBConnection connection = new DBConnection();
         con = (Connection) connection.getConnection();

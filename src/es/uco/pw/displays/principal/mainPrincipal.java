@@ -36,7 +36,7 @@ public class mainPrincipal {
      * @param args Los argumentos de línea de comandos (no utilizados).
      * @throws IOException    Si ocurre un error al cargar o guardar datos en los ficheros.
      * @throws ParseException Si ocurre un error de análisis de datos.
-     * @throws SQLException 
+     * @throws SQLException  Si ocurre un error en la Base de Datos.
      */
     public static void main(String[] args) throws IOException, ParseException, SQLException {
         Scanner sc = new Scanner(System.in);
@@ -65,7 +65,7 @@ public class mainPrincipal {
                     mainJugadores.main(sc); // Pasar el Scanner al menú de Usuarios
                     break;
                 case 0:
-                    System.out.println("Saliendo del programa. Guardando datos en los ficheros...");
+                    System.out.println("Saliendo del programa...");
                     continuar = false; // Romper el bucle para salir
                     break;
                 default:

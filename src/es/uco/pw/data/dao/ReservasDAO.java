@@ -8,20 +8,25 @@ import es.uco.pw.data.common.DBConnection;
 
 import java.util.*;
 import java.io.*;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
-import com.mysql.jdbc.Connection;
-import com.mysql.jdbc.ResultSet;
-import com.mysql.jdbc.Statement;
+import java.sql.*;
+import java.util.Date;
 
 /**
  * Clase que gestiona las reservas de pistas de baloncesto, incluyendo la carga y
  * almacenamiento de reservas en ficheros, así como la gestión de jugadores y pistas.
  */
 public class ReservasDAO {
-    private Connection con;
-    private Properties prop;
+	/**
+	 * Conexión actual con la base de datos.
+	 */
+	private Connection con;
+
+	/**
+	 * Propiedades con las consultas SQL necesarias para el funcionamiento del DAO.
+	 */
+	private Properties prop;
+
 
     /**
      * Constructor que inicializa la conexión a la base de datos y carga las propiedades SQL.
@@ -190,17 +195,22 @@ public class ReservasDAO {
     /**
      * Obtiene un bono por su ID.
      *
-     * @param idBono El ID del bono a obtener.
-     * @return El bono obtenido o null si no se encuentra.
+	 * @param idBono El ID del bono a obtener.
+	 * @return El bono obtenido o null si no se encuentra.
      */
     public Bono obtenerBono(int idBono) {
         Bono bono = null;
         String sql = prop.getProperty("obtenerBono");
 
-        if (con == null || con.isClosed()) {
-            DBConnection conexion = new DBConnection();
-            con = (Connection) conexion.getConnection();
+        try {
+            if (con == null || con.isClosed()) {
+                DBConnection conexion = new DBConnection();
+                con = (Connection) conexion.getConnection();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Error al verificar o reestablecer la conexión con la base de datos.", e);
         }
+
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idBono);
@@ -287,7 +297,6 @@ public class ReservasDAO {
      * @param numeroAdultos         El nuevo número de adultos para la reserva (solo para reservas familiares o de adultos).
      * @param numeroNinos           El nuevo número de niños para la reserva (solo para reservas familiares o infantiles).
      *
-     * @throws SQLException Si ocurre un error al realizar las operaciones en la base de datos.
      *
      * <p>La función utiliza sentencias SQL preparadas para asegurar la actualización correcta y segura de los datos.
      * Dependiendo de los parámetros proporcionados, se actualizan las tablas correspondientes:
@@ -440,9 +449,10 @@ public class ReservasDAO {
      * @param fechaHora La fecha y hora de la reserva.
      * @param duracionMinutos La duración de la reserva en minutos.
      * @param pistaDTO La pista a reservar.
-     * @param numeroAdultos El número de adultos en la reserva.
-     * @param numeroNinos El número de niños en la reserva.
-     * @throws IllegalArgumentException Si la cuenta del jugador no es válida.
+     * @param numeroAdultos El número de adultos incluidos en la reserva.
+     * @param numeroNinos El número de niños incluidos en la reserva.
+     * @return El ID de la reserva creada.
+     * @throws IllegalArgumentException Si la cuenta del jugador no está activa, si los parámetros son inválidos, o si la pista no cumple las condiciones para el tipo de reserva.
      */
     public int hacerReservaIndividual(JugadorDTO jugadorDTO, Date fechaHora, int duracionMinutos, PistaDTO pistaDTO, int numeroAdultos, int numeroNinos) {
         if (!jugadorDTO.isCuentaActiva()) {
@@ -486,11 +496,12 @@ public class ReservasDAO {
      * @param fechaHora La fecha y hora de la reserva.
      * @param duracionMinutos La duración de la reserva en minutos.
      * @param pistaDTO La pista a reservar.
-     * @param numeroAdultos El número de adultos en la reserva.
-     * @param numeroNinos El número de niños en la reserva.
-     * @param bono El bono a utilizar en la reserva.
-     * @param numeroSesion El número de la sesión del bono.
-     * @throws IllegalArgumentException Si la cuenta del jugador no está activa o si la pista no es válida para el tipo de reserva.
+     * @param numeroAdultos El número de adultos incluidos en la reserva.
+     * @param numeroNinos El número de niños incluidos en la reserva.
+     * @return {@code true} si la reserva se realiza correctamente, {@code false} en caso contrario.
+     * @throws IllegalArgumentException Si la cuenta del jugador no está activa, si los parámetros son inválidos, o si la pista no cumple las condiciones para el tipo de reserva.
+     * @throws SQLException Si ocurre un error al interactuar con la base de datos.
+     * @throws IllegalStateException Si no se puede crear un bono válido para el jugador.
      */
     public boolean hacerReservaBono(JugadorDTO jugadorDTO, Date fechaHora, int duracionMinutos, PistaDTO pistaDTO, int numeroAdultos, int numeroNinos) throws SQLException {
         if (!jugadorDTO.isCuentaActiva()) {
@@ -548,16 +559,18 @@ public class ReservasDAO {
     /**
      * Modifica una reserva existente.
      *
-     * @param reservaDTO La reserva a modificar.
-     * @param pistaDTO La nueva pista para la reserva.
-     * @param fechaHoraOriginal La fecha y hora original de la reserva.
+     * @param jugadorDTO El jugador asociado a la reserva que se va a modificar.
+     * @param pistaOriginal La pista original en la que se realizó la reserva.
+     * @param fechaHoraOriginal La fecha y hora originales de la reserva.
+     * @param nuevaPista La nueva pista donde se realizará la reserva.
      * @param nuevaFechaHora La nueva fecha y hora de la reserva.
-     * @param nuevaDuracionMinutos La nueva duración de la reserva en minutos.
+     * @param nuevaDuracionMinutos La nueva duración de la reserva, en minutos.
      * @param numeroAdultos El nuevo número de adultos en la reserva.
      * @param numeroNinos El nuevo número de niños en la reserva.
      * @param bono El bono a utilizar en la nueva reserva, si aplica.
      * @param numeroSesion El número de la sesión del bono, si aplica.
-     * @throws IllegalArgumentException Si no se encuentra el jugador o la pista, si no se puede modificar la reserva, o si la pista no es válida.
+     * @throws IllegalArgumentException Si no se encuentra la reserva, si no se puede modificar, si la pista no es válida o si los parámetros son inválidos.
+     * @throws IllegalStateException Si ocurre un error al actualizar la base de datos.
      */
     public void modificarReserva(JugadorDTO jugadorDTO, PistaDTO pistaOriginal, Date fechaHoraOriginal, PistaDTO nuevaPista, Date nuevaFechaHora, int nuevaDuracionMinutos, int numeroAdultos, int numeroNinos, Bono bono, int numeroSesion) {
         // Buscar la reserva existente en la base de datos
@@ -774,8 +787,9 @@ public class ReservasDAO {
     /**
      * Consulta las reservas para un día específico y una pista específica.
      *
-     * @param dia La fecha del día para consultar reservas.
-     * @param idPista El ID de la pista para consultar reservas.
+     * @param fechaInicio Fecha inicio para consultar reservas.
+     * @param fechaFin Fecha fin para consultar reservas..
+     * @param idPistaConsulta El id de la pista para consultar las reservas.
      * @return Una lista de reservas para el día y la pista especificados.
      */
 
@@ -903,7 +917,6 @@ public class ReservasDAO {
      * @param idReserva El ID de la reserva.
      * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto),
      *         o null si no se encuentra la reserva.
-     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
      */
     public ReservaDTO obtenerReservaCompleta(int idReserva) {
         String sqlBaseReserva = prop.getProperty("buscarReservaBase");
@@ -1005,7 +1018,6 @@ public class ReservasDAO {
      * @param fechaHora La fecha y hora de la reserva.
      * @return La instancia completa de ReservaDTO según el tipo (Infantil, Familiar o Adulto),
      *         o null si no se encuentra la reserva.
-     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
      */
     public ReservaDTO encontrarReserva(int idJugador, int idPista, Date fechaHora) {
         ReservaDTO reservaDTO = null;
@@ -1347,7 +1359,6 @@ public class ReservasDAO {
      * @param idUsuario El ID del usuario.
      * @param bono El bono asociado.
      * @return La reserva encontrada, o null si no existe.
-     * @throws SQLException Si ocurre un error al ejecutar la consulta SQL.
      */
     public ReservaDTO obtenerReservaPorIdBono(int idUsuario, Bono bono) {
         ReservaDTO reservaDTO = null;
@@ -1442,7 +1453,5 @@ public class ReservasDAO {
 
         return reservaDTO;
     }
-
-
 
 }

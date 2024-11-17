@@ -8,6 +8,9 @@ import java.util.Date;
  */
 public class ReservaAdulto extends ReservaDTO {
     // Atributo específico de ReservaAdulto
+	/**
+	 * Número de adultos incluidos en la reserva adulto.
+	 */
     private int numeroAdultos;
 
     /**

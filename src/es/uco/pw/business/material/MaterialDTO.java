@@ -5,10 +5,25 @@ package es.uco.pw.business.material;
  */
 public class MaterialDTO {
     
-    private int id;                  // Identificador del material
-    private TipoMaterial tipo;       // Tipo de material
-    private boolean usoExterior;     // Indica si el material es apto para uso exterior
-    private EstadoMaterial estado;    // Estado actual del material
+	/**
+	 * Identificador único del material.
+	 */
+	private int id;
+
+	/**
+	 * Tipo de material (por ejemplo, pelota, cono, canasta).
+	 */
+	private TipoMaterial tipo;
+
+	/**
+	 * Indica si el material es apto para uso en exteriores.
+	 */
+	private boolean usoExterior;
+
+	/**
+	 * Estado actual del material (disponible, reservado, en mal estado).
+	 */
+	private EstadoMaterial estado;
     
     /**
      * Constructor por defecto.

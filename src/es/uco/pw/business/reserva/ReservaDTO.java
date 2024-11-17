@@ -7,15 +7,45 @@ import java.util.Date;
  * Contiene atributos comunes a todas las reservas y métodos para calcular precios.
  */
 public abstract class ReservaDTO {
-    // Atributos comunes a todas las reservas
-	private int idReserva; // Nuevo campo
-    private int idUsuario;
-    private Date fechaHora;
-    private int duracionMinutos;
-    private int idPista;
-    private float precio;
-    private float descuento;
-    protected ReservaDTO reservaEspecifica; // Agregar reserva específica como un campo opcional
+	/**
+	 * Identificador único de la reserva.
+	 */
+	private int idReserva;
+
+	/**
+	 * Identificador del usuario que realizó la reserva.
+	 */
+	private int idUsuario;
+
+	/**
+	 * Fecha y hora de la reserva.
+	 */
+	private Date fechaHora;
+
+	/**
+	 * Duración de la reserva en minutos.
+	 */
+	private int duracionMinutos;
+
+	/**
+	 * Identificador de la pista reservada.
+	 */
+	private int idPista;
+
+	/**
+	 * Precio de la reserva.
+	 */
+	private float precio;
+
+	/**
+	 * Descuento aplicado a la reserva.
+	 */
+	private float descuento;
+
+	/**
+	 * Reserva específica asociada a esta reserva, si aplica.
+	 */
+	protected ReservaDTO reservaEspecifica;
 
     /** 
      * Constructor vacío.
@@ -171,21 +201,39 @@ public abstract class ReservaDTO {
 		this.descuento = descuento;
 	}
 
-	public int getIdReserva() {
+    /**
+     * Obtiene el identificador único de la reserva.
+     * 
+     * @return El identificador único de la reserva.
+     */
+    public int getIdReserva() {
         return idReserva;
     }
 
+    /**
+     * Establece el identificador único de la reserva.
+     * 
+     * @param idReserva El nuevo identificador único de la reserva.
+     */
     public void setIdReserva(int idReserva) {
         this.idReserva = idReserva;
     }
 
-
-
+    /**
+     * Obtiene la reserva específica asociada a esta reserva, si aplica.
+     * 
+     * @return La reserva específica asociada, o null si no hay ninguna.
+     */
     public ReservaDTO getReservaEspecifica() {
-		return reservaEspecifica;
-	}
+        return reservaEspecifica;
+    }
 
-	public void setReservaEspecifica(ReservaDTO reservaEspecifica) {
+    /**
+     * Establece una reserva específica asociada a esta reserva.
+     * 
+     * @param reservaEspecifica La reserva específica asociada.
+     */
+    public void setReservaEspecifica(ReservaDTO reservaEspecifica) {
         this.reservaEspecifica = reservaEspecifica;
     }
     

@@ -7,8 +7,17 @@ import java.util.Date;
  * Extiende la clase Reserva y utiliza sesiones de un bono.
  */
 public class ReservaBono extends ReservaDTO {
+    /**
+     * Identificador único del bono.
+     */
     private int idBono;
+    /**
+     * Número de sesiones consumidas en el bono..
+     */
     private int numeroSesion;
+    /**
+     * Objeto bono, con eso se hacen reservas de bono y se asocia la info del bono a una reserva.
+     */
     private Bono bono;
 
     /**
