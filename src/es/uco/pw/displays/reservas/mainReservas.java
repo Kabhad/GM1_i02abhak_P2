@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 
 /**
@@ -58,6 +59,7 @@ public class mainReservas {
             case 1:
                 System.out.println("Iniciando proceso para hacer una reserva individual...");
                 try {
+                    // Solicitar correo del usuario
                     System.out.print("Ingrese el correo del usuario: ");
                     String correo = sc.nextLine();
                     JugadorDTO jugadorDTO = reservasDAO.buscarJugadorPorCorreo(correo);
@@ -65,30 +67,50 @@ public class mainReservas {
                         System.out.println("Jugador no encontrado.");
                         break;
                     }
+                    
+                    System.out.print("Ingrese número de adultos: ");
+                    int numeroAdultos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
 
-                    System.out.print("Ingrese el tipo de reserva (infantil, familiar, adulto): ");
-                    String tipoReserva = sc.nextLine().toLowerCase();
+                    System.out.print("Ingrese número de niños: ");
+                    int numeroNinos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+                    
+                    
+                    String tipoReserva = reservasDAO.determinarTipoReserva(numeroAdultos, numeroNinos);
 
-                    List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles(tipoReserva);
+                    // Número total de jugadores para la reserva
+                    int totalJugadores = numeroAdultos + numeroNinos;
+
+                    // Listar pistas disponibles según el tipo de reserva y capacidad
+                    List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles(tipoReserva).stream()
+                        .filter(pista -> pista.getMax_jugadores() >= totalJugadores)
+                        .collect(Collectors.toList());
+
                     if (pistasDisponibles.isEmpty()) {
-                        System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReserva + "'.");
+                        System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReserva + "' con un máximo de " + totalJugadores + " jugadores.");
                         break;
                     }
 
+                    // Mostrar las pistas disponibles
                     System.out.println("Pistas disponibles para reservar:");
                     for (PistaDTO pistaDTO : pistasDisponibles) {
                         System.out.println("ID: " + pistaDTO.getIdPista() + ", Nombre: " + pistaDTO.getNombrePista() + ", Máx. Jugadores: " + pistaDTO.getMax_jugadores());
                     }
 
+                    // Solicitar ID de la pista
                     System.out.print("Ingrese ID de la pista: ");
                     int idPista = sc.nextInt();
                     sc.nextLine(); // Limpiar buffer
+
+                    // Validar que el ID de pista seleccionado esté en la lista de disponibles
                     PistaDTO pistaDTO = pistasDisponibles.stream().filter(p -> p.getIdPista() == idPista).findFirst().orElse(null);
                     if (pistaDTO == null) {
-                        System.out.println("Pista no válida.");
+                        System.out.println("Pista no válida. Seleccione una pista de la lista mostrada.");
                         break;
                     }
 
+                    // Solicitar detalles adicionales de la reserva
                     System.out.print("Ingrese fecha y hora (yyyy-MM-dd HH:mm): ");
                     Date fechaHora = dateFormat.parse(sc.nextLine());
 
@@ -96,30 +118,15 @@ public class mainReservas {
                     int duracionMinutos = sc.nextInt();
                     sc.nextLine(); // Limpiar buffer
 
-                    int numeroAdultos = 0;
-                    int numeroNinos = 0;
-
-                    if (tipoReserva.equals("familiar") || tipoReserva.equals("adulto")) {
-                        System.out.print("Ingrese número de adultos: ");
-                        numeroAdultos = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-                    }
-                    if (tipoReserva.equals("familiar") || tipoReserva.equals("infantil")) {
-                        System.out.print("Ingrese número de niños: ");
-                        numeroNinos = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-                    }
 
                     try {
-                        // Crear la reserva
+                        // Crear la reserva individual
                         int idReserva = reservasDAO.hacerReservaIndividual(jugadorDTO, fechaHora, duracionMinutos, pistaDTO, numeroAdultos, numeroNinos);
 
-                        // Mostrar detalles de la reserva
-                        System.out.println("Reserva individual creada correctamente con ID: " + idReserva);
-                        ReservaDTO reserva = reservasDAO.obtenerReservaPorId(idReserva); // Necesitas este método para obtener la reserva
-                        if (reserva != null) {
-                            System.out.println(reserva.toString());
-                        }
+                        // Mostrar los detalles de la reserva creada
+                        ReservaDTO reserva = reservasDAO.obtenerReservaPorId(idReserva);
+                        System.out.println("Reserva individual creada correctamente:");
+                        System.out.println(reserva.toString());
                     } catch (IllegalArgumentException e) {
                         System.out.println("Error al crear la reserva: " + e.getMessage());
                     }
@@ -128,9 +135,11 @@ public class mainReservas {
                 }
                 break;
 
+                
             case 2:
                 System.out.println("Iniciando proceso para hacer una reserva con bono...");
                 try {
+                    // Solicitar correo del usuario
                     System.out.print("Ingrese el correo del usuario: ");
                     String correoBono = sc.nextLine();
                     JugadorDTO jugadorBono = reservasDAO.buscarJugadorPorCorreo(correoBono);
@@ -139,29 +148,49 @@ public class mainReservas {
                         break;
                     }
 
-                    System.out.print("Ingrese el tipo de reserva (infantil, familiar, adulto): ");
-                    String tipoReservaBono = sc.nextLine().toLowerCase();
+                    System.out.print("Ingrese número de adultos: ");
+                    int numeroAdultosBono = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
 
-                    List<PistaDTO> pistasDisponiblesBono = reservasDAO.listarPistasDisponibles(tipoReservaBono);
+                    System.out.print("Ingrese número de niños: ");
+                    int numeroNinosBono = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+                    
+                    
+                    String tipoReservaBono = reservasDAO.determinarTipoReserva(numeroAdultosBono, numeroNinosBono);
+
+                 // Número total de jugadores para la reserva
+                    int totalJugadores = numeroAdultosBono + numeroNinosBono;
+
+                    // Listar pistas disponibles según el tipo de reserva y capacidad
+                    List<PistaDTO> pistasDisponiblesBono = reservasDAO.listarPistasDisponibles(tipoReservaBono).stream()
+                        .filter(pista -> pista.getMax_jugadores() >= totalJugadores)
+                        .collect(Collectors.toList());
+
                     if (pistasDisponiblesBono.isEmpty()) {
-                        System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReservaBono + "'.");
+                        System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReservaBono + "' con un máximo de " + totalJugadores + " jugadores.");
                         break;
                     }
 
+                    // Mostrar las pistas disponibles
                     System.out.println("Pistas disponibles para reservar con bono:");
                     for (PistaDTO pistaDTO : pistasDisponiblesBono) {
                         System.out.println("ID: " + pistaDTO.getIdPista() + ", Nombre: " + pistaDTO.getNombrePista() + ", Máx. Jugadores: " + pistaDTO.getMax_jugadores());
                     }
 
+                    // Solicitar ID de la pista
                     System.out.print("Ingrese ID de la pista: ");
                     int idPistaBono = sc.nextInt();
                     sc.nextLine(); // Limpiar buffer
+
+                    // Validar que el ID de pista seleccionado esté en la lista de disponibles
                     PistaDTO pistaBono = pistasDisponiblesBono.stream().filter(p -> p.getIdPista() == idPistaBono).findFirst().orElse(null);
                     if (pistaBono == null) {
-                        System.out.println("Pista no válida.");
+                        System.out.println("Pista no válida. Seleccione una pista de la lista mostrada.");
                         break;
                     }
 
+                    // Solicitar detalles adicionales de la reserva
                     System.out.print("Ingrese fecha y hora de la reserva (yyyy-MM-dd HH:mm): ");
                     Date fechaHoraBono = dateFormat.parse(sc.nextLine());
 
@@ -169,147 +198,163 @@ public class mainReservas {
                     int duracionMinutosBono = sc.nextInt();
                     sc.nextLine(); // Limpiar buffer
 
-                    int numeroAdultosBono = 0;
-                    int numeroNinosBono = 0;
 
-                    if (tipoReservaBono.equals("familiar") || tipoReservaBono.equals("adulto")) {
-                        System.out.print("Ingrese número de adultos: ");
-                        numeroAdultosBono = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-                    }
-                    if (tipoReservaBono.equals("familiar") || tipoReservaBono.equals("infantil")) {
-                        System.out.print("Ingrese número de niños: ");
-                        numeroNinosBono = sc.nextInt();
-                        sc.nextLine(); // Limpiar buffer
-                    }
-
-                    boolean reservaConBonoExitosa = false;
                     try {
-                        // Intentar hacer la reserva con bono
-                        reservaConBonoExitosa = reservasDAO.hacerReservaBono(jugadorBono, fechaHoraBono, duracionMinutosBono, pistaBono, numeroAdultosBono, numeroNinosBono);
+                        // Crear la reserva con bono
+                        boolean reservaConBonoExitosa = reservasDAO.hacerReservaBono(jugadorBono, fechaHoraBono, duracionMinutosBono, pistaBono, numeroAdultosBono, numeroNinosBono);
 
-                        // Mostrar detalles de la reserva si fue exitosa
+                        // Mostrar los detalles de la reserva creada si fue exitosa
                         if (reservaConBonoExitosa) {
-                            // Obtener el Bono del jugador
-                            Bono bono = reservasDAO.obtenerBonoPorJugador(jugadorBono.getIdJugador());
-                            if (bono != null) {
-                                // Usar el idReserva y el idBono para obtener la reserva con bono
-                                ReservaDTO reserva = reservasDAO.obtenerReservaPorIdBono(jugadorBono.getIdJugador(), bono);
-                                if (reserva != null) {
-                                    System.out.println("Reserva de bono creada correctamente:");
-                                    System.out.println(reserva.toString());
-                                } else {
-                                    System.out.println("No se encontró la reserva creada.");
-                                }
+                            ReservaDTO reserva = reservasDAO.obtenerReservaPorIdBono(jugadorBono.getIdJugador(), reservasDAO.obtenerBonoPorJugador(jugadorBono.getIdJugador()));
+                            if (reserva != null) {
+                                System.out.println("Reserva con bono creada correctamente:");
+                                System.out.println(reserva.toString());
                             } else {
-                                System.out.println("Error: No se pudo obtener el bono del jugador.");
+                                System.out.println("Error al recuperar la reserva de bono creada.");
                             }
-                        } else {
-                            System.out.println("Error: No se pudo crear la reserva de bono.");
                         }
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("Error al crear la reserva con bono: " + e.getMessage());
                     } catch (SQLException e) {
                         System.out.println("Error en la base de datos: " + e.getMessage());
                     }
-
                 } catch (ParseException e) {
                     System.out.println("Formato de fecha incorrecto.");
                 }
                 break;
 
 
+            case 3:
+                // Modificar una reserva
+                System.out.println("Iniciando proceso para modificar una reserva...");
+                try {
+                    // Ingresar el correo del jugador
+                    System.out.print("Ingrese el correo del usuario: ");
+                    String correoModificacion = sc.nextLine();
+                    JugadorDTO jugadorModificacion = reservasDAO.buscarJugadorPorCorreo(correoModificacion);
+                    if (jugadorModificacion == null) {
+                        System.out.println("Jugador no encontrado.");
+                        break;
+                    }
 
-                
-                case 3:
-                	// Modificar una reserva
-                	System.out.println("Iniciando proceso para modificar una reserva...");
-                	try {
-                	    System.out.print("Ingrese el correo del usuario: ");
-                	    String correoModificacion = sc.nextLine();
-                	    JugadorDTO jugadorModificacion = reservasDAO.buscarJugadorPorCorreo(correoModificacion);
-                	    if (jugadorModificacion == null) {
-                	        System.out.println("Jugador no encontrado.");
-                	        break;
-                	    }
+                    // Ingresar los detalles de la pista actual
+                    System.out.print("Ingrese ID de la pista actual: ");
+                    int idPistaModificacion = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+                    PistaDTO pistaModificacion = reservasDAO.buscarPistaPorId(idPistaModificacion);
+                    if (pistaModificacion == null) {
+                        System.out.println("Pista no válida.");
+                        break;
+                    }
 
-                	    System.out.print("Ingrese ID de la pista actual: ");
-                	    int idPistaModificacion = sc.nextInt();
-                	    sc.nextLine(); // Limpiar buffer
-                	    PistaDTO pistaModificacion = reservasDAO.buscarPistaPorId(idPistaModificacion);
-                	    if (pistaModificacion == null) {
-                	        System.out.println("Pista no válida.");
-                	        break;
-                	    }
+                    // Ingresar fecha y hora originales
+                    System.out.print("Ingrese fecha y hora originales (yyyy-MM-dd HH:mm): ");
+                    Date fechaHoraModificacion = dateFormat.parse(sc.nextLine());
 
-                	    System.out.print("Ingrese fecha y hora originales (yyyy-MM-dd HH:mm): ");
-                	    Date fechaHoraModificacion = dateFormat.parse(sc.nextLine());
+                    // Buscar la reserva original
+                    ReservaDTO reservaDTO = reservasDAO.encontrarReserva(jugadorModificacion.getIdJugador(), idPistaModificacion, fechaHoraModificacion);
+                    if (reservaDTO == null) {
+                        System.out.println("Reserva no encontrada.");
+                        break;
+                    }
+                    
+                    System.out.print("Ingrese nuevo número de adultos: ");
+                    int nuevosAdultos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
 
-                	    // Buscar la reserva original en la base de datos
-                	    ReservaDTO reservaDTO = reservasDAO.encontrarReserva(jugadorModificacion.getIdJugador(), idPistaModificacion, fechaHoraModificacion);
-                	    if (reservaDTO == null) {
-                	        System.out.println("Reserva no encontrada.");
-                	        break;
-                	    }
+                    System.out.print("Ingrese nuevo número de niños: ");
+                    int nuevosNinos = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+                    
+                    // Determinar el tipo de reserva basado en los parámetros originales
+                    String tipoReserva = reservasDAO.determinarTipoReserva(nuevosAdultos, nuevosNinos);
 
-                	    System.out.print("¿Desea cambiar de pista? (s/n): ");
-                	    String cambiarPista = sc.nextLine();
-                	    PistaDTO nuevaPista = pistaModificacion; // Default to current if no change
+                    // Número total de jugadores
+                    int totalJugadores = nuevosAdultos + nuevosNinos;
 
-                	    if (cambiarPista.equalsIgnoreCase("s")) {
-                	        System.out.print("Ingrese el nuevo ID de la pista: ");
-                	        int nuevoIdPista = sc.nextInt();
-                	        sc.nextLine(); // Limpiar buffer
-                	        nuevaPista = reservasDAO.buscarPistaPorId(nuevoIdPista);
-                	        if (nuevaPista == null) {
-                	            System.out.println("Pista no válida.");
-                	            break;
-                	        }
-                	    }
+                    // Decidir si cambiar de pista
+                    System.out.print("¿Desea cambiar de pista? (s/n): ");
+                    String cambiarPista = sc.nextLine();
+                    PistaDTO nuevaPista = pistaModificacion; // Por defecto, se mantiene la pista actual
 
-                	    System.out.print("Ingrese nueva fecha y hora (yyyy-MM-dd HH:mm): ");
-                	    Date nuevaFechaHora = dateFormat.parse(sc.nextLine());
+                    if (cambiarPista.equalsIgnoreCase("s")) {
+                        // Listar pistas disponibles según el tipo de reserva y capacidad
+                        List<PistaDTO> pistasDisponibles = reservasDAO.listarPistasDisponibles(tipoReserva).stream()
+                            .filter(pista -> pista.getMax_jugadores() >= totalJugadores)
+                            .collect(Collectors.toList());
 
-                	    System.out.print("Ingrese nueva duración en minutos (60, 90, 120): ");
-                	    int nuevaDuracion = sc.nextInt();
-                	    sc.nextLine(); // Limpiar buffer
+                        if (pistasDisponibles.isEmpty()) {
+                            System.out.println("No hay pistas disponibles para el tipo de reserva '" + tipoReserva + "' con un máximo de " + totalJugadores + " jugadores.");
+                            break;
+                        }
 
-                	    System.out.print("Ingrese nuevo número de adultos: ");
-                	    int nuevosAdultos = sc.nextInt();
-                	    sc.nextLine(); // Limpiar buffer
+                        // Mostrar las pistas disponibles
+                        System.out.println("Pistas disponibles para cambiar:");
+                        for (PistaDTO pistaDTO : pistasDisponibles) {
+                            System.out.println("ID: " + pistaDTO.getIdPista() + ", Nombre: " + pistaDTO.getNombrePista() + ", Máx. Jugadores: " + pistaDTO.getMax_jugadores());
+                        }
 
-                	    System.out.print("Ingrese nuevo número de niños: ");
-                	    int nuevosNinos = sc.nextInt();
-                	    sc.nextLine(); // Limpiar buffer
+                        // Solicitar ID de la nueva pista
+                        System.out.print("Ingrese el nuevo ID de la pista: ");
+                        int nuevoIdPista = sc.nextInt();
+                        sc.nextLine(); // Limpiar buffer
 
-                	    Bono bono = null;
-                	    int numeroSesion = 0;
+                        // Validar que el ID de pista seleccionado esté en la lista de disponibles
+                        nuevaPista = pistasDisponibles.stream().filter(p -> p.getIdPista() == nuevoIdPista).findFirst().orElse(null);
+                        if (nuevaPista == null) {
+                            System.out.println("Pista no válida. Seleccione una pista de la lista mostrada.");
+                            break;
+                        }
+                    }
 
-                	    if (reservaDTO instanceof ReservaBono) {
-                	        bono = ((ReservaBono) reservaDTO).getBono();
-                	        numeroSesion = ((ReservaBono) reservaDTO).getNumeroSesion();
-                	    }
+                    // Ingresar nuevos detalles de la reserva
+                    System.out.print("Ingrese nueva fecha y hora (yyyy-MM-dd HH:mm): ");
+                    Date nuevaFechaHora = dateFormat.parse(sc.nextLine());
 
-                	    // Llamada a modificarReserva en la instancia reservasDAO
-                	    try {
-                	        reservasDAO.modificarReserva(
-                	            jugadorModificacion,                // JugadorDTO
-                	            pistaModificacion,                  // PistaDTO para la pista original
-                	            fechaHoraModificacion,              // Fecha y hora originales
-                	            nuevaPista,                         // Nueva PistaDTO (puede ser la misma)
-                	            nuevaFechaHora,                     // Nueva fecha y hora
-                	            nuevaDuracion,                      // Nueva duración en minutos
-                	            nuevosAdultos,                      // Nuevo número de adultos
-                	            nuevosNinos,                        // Nuevo número de niños
-                	            bono,                               // Bono (si aplica)
-                	            numeroSesion                        // Número de sesión del bono (si aplica)
-                	        );
-                	        System.out.println("Reserva modificada exitosamente.");
-                	    } catch (IllegalArgumentException e) {
-                	        System.out.println("Error al modificar la reserva: " + e.getMessage());
-                	    }
-                	} catch (ParseException e) {
-                	    System.out.println("Formato de fecha incorrecto.");
-                	}
-                	break;
+                    System.out.print("Ingrese nueva duración en minutos (60, 90, 120): ");
+                    int nuevaDuracion = sc.nextInt();
+                    sc.nextLine(); // Limpiar buffer
+
+                    // Manejo del bono y la sesión (si aplica)
+                    Bono bono = null;
+                    int numeroSesion = 0;
+                    if (reservaDTO instanceof ReservaBono) {
+                        bono = ((ReservaBono) reservaDTO).getBono();
+                        numeroSesion = ((ReservaBono) reservaDTO).getNumeroSesion();
+                    }
+
+                    // Modificar la reserva
+                    try {
+                        reservasDAO.modificarReserva(
+                            jugadorModificacion,        // JugadorDTO
+                            pistaModificacion,          // PistaDTO para la pista original
+                            fechaHoraModificacion,      // Fecha y hora originales
+                            nuevaPista,                 // Nueva PistaDTO (puede ser la misma)
+                            nuevaFechaHora,             // Nueva fecha y hora
+                            nuevaDuracion,              // Nueva duración en minutos
+                            nuevosAdultos,              // Nuevo número de adultos
+                            nuevosNinos,                // Nuevo número de niños
+                            bono,                       // Bono (si aplica)
+                            numeroSesion                // Número de sesión del bono (si aplica)
+                        );
+
+                        // Obtener la reserva modificada y mostrar los detalles
+                        ReservaDTO reservaModificada = reservasDAO.encontrarReserva(jugadorModificacion.getIdJugador(), nuevaPista.getIdPista(), nuevaFechaHora);
+                        if (reservaModificada != null) {
+                            System.out.println("Reserva modificada correctamente:");
+                            System.out.println(reservaModificada.toString());
+                        } else {
+                            System.out.println("La reserva fue modificada, pero no se pudo recuperar para mostrar los detalles.");
+                        }
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("Error al modificar la reserva: " + e.getMessage());
+                    }
+                } catch (ParseException e) {
+                    System.out.println("Formato de fecha incorrecto.");
+                }
+                break;
+
+
 
                 case 4:
                     // Cancelar una reserva

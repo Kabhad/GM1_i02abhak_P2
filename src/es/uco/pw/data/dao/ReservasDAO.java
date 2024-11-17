@@ -99,6 +99,27 @@ public class ReservasDAO {
             ps.executeUpdate();
         }
     }
+    
+    public void insertarReservaEspecifica(String tipoReserva, int idReserva, Integer numeroAdultos, Integer numeroNinos) throws SQLException {
+        if (con == null || con.isClosed()) {
+            DBConnection conexion = new DBConnection();
+            con = (Connection) conexion.getConnection(); // Inicializar conexión global
+        }
+        switch (tipoReserva.toLowerCase()) {
+            case "familiar":
+                insertarReservaFamiliar(idReserva, numeroAdultos, numeroNinos);
+                break;
+            case "adulto":
+                insertarReservaAdulto(idReserva, numeroAdultos);
+                break;
+            case "infantil":
+                insertarReservaInfantil(idReserva, numeroNinos);
+                break;
+            default:
+                throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
+        }
+    }
+
 
     /**
      * Inserta una nueva reserva en la base de datos.
@@ -204,10 +225,14 @@ public class ReservasDAO {
 
         String sql = prop.getProperty("insertarBono");
 
+        // Abrir conexión
+        DBConnection conexion = new DBConnection();
+        Connection con = (Connection) conexion.getConnection();
+
         try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             // Configurar los parámetros de la consulta
             ps.setInt(1, idUsuario); // Asignar el idUsuario (idJugador)
-            ps.setInt(2, 0); // Inicializar numeroSesion como 0 (aún no se ha usado ninguna sesión)
+            ps.setInt(2, 0); // Inicializar numeroSesion a 0
             ps.setDate(3, new java.sql.Date(bono.getFechaCaducidad().getTime())); // Fecha de caducidad
 
             ps.executeUpdate();
@@ -220,6 +245,15 @@ public class ReservasDAO {
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            // Cerrar conexión
+            try {
+                if (con != null && !con.isClosed()) {
+                    con.close();
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
 
         return bono;
@@ -269,8 +303,6 @@ public class ReservasDAO {
                 ps.setFloat(4, nuevoDescuento);
                 ps.setInt(5, nuevaIdPista);
                 ps.setInt(6, idReserva);
-                int affectedRows = ps.executeUpdate();
-                System.out.println("Actualización en tabla Reserva: " + affectedRows + " filas afectadas.");
             }
 
             // Actualizar tabla específica según el tipo de reserva
@@ -278,23 +310,17 @@ public class ReservasDAO {
                 try (PreparedStatement psInfantil = con.prepareStatement(sqlActualizarReservaInfantil)) {
                     psInfantil.setInt(1, numeroNinos);
                     psInfantil.setInt(2, idReserva);
-                    int affectedRowsInfantil = psInfantil.executeUpdate();
-                    System.out.println("Actualización en tabla ReservaInfantil: " + affectedRowsInfantil + " filas afectadas.");
                 }
             } else if (numeroNinos != null && numeroAdultos != null) {  // Familiar
                 try (PreparedStatement psFamiliar = con.prepareStatement(sqlActualizarReservaFamiliar)) {
                     psFamiliar.setInt(1, numeroAdultos);
                     psFamiliar.setInt(2, numeroNinos);
                     psFamiliar.setInt(3, idReserva);
-                    int affectedRowsFamiliar = psFamiliar.executeUpdate();
-                    System.out.println("Actualización en tabla ReservaFamiliar: " + affectedRowsFamiliar + " filas afectadas.");
                 }
             } else if (numeroAdultos != null && numeroNinos == null) {  // Adulto
                 try (PreparedStatement psAdulto = con.prepareStatement(sqlActualizarReservaAdulto)) {
                     psAdulto.setInt(1, numeroAdultos);
                     psAdulto.setInt(2, idReserva);
-                    int affectedRowsAdulto = psAdulto.executeUpdate();
-                    System.out.println("Actualización en tabla ReservaAdulto: " + affectedRowsAdulto + " filas afectadas.");
                 }
             }
         } catch (SQLException e) {
@@ -384,29 +410,18 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La cuenta del jugador no está activa.");
         }
 
-        // Validar que la reserva sea para una fecha futura con al menos 6 horas de antelación
-        Date ahora = new Date();
-        Calendar calendario = Calendar.getInstance();
-        calendario.setTime(ahora);
-        calendario.add(Calendar.HOUR, 6);
-        Date limiteMinimoReserva = calendario.getTime();
-
-        if (fechaHora.before(limiteMinimoReserva)) {
-            throw new IllegalArgumentException("La reserva debe realizarse con al menos 6 horas de antelación y no puede ser en una fecha pasada.");
-        }
-
+        // Validaciones comunes
+        validarFechaHora(fechaHora);
+        validarMaximoJugadores(pistaDTO, numeroAdultos, numeroNinos);
         String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
-        if (!cumpleCondicionesTipoReserva(pistaDTO, tipoReserva)) {
-            throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
-        }
 
-        // Calcular el descuento por antigüedad si el jugador tiene más de 2 años de inscripción
+        // Validaciones exclusivas y creación de la reserva
         float descuentoAntiguedad = (jugadorDTO.calcularAntiguedad() > 2) ? 0.1f : 0.0f;
 
         ReservaFactory reservaFactory = new ReservaIndividualFactory();
         ReservaDTO reservaDTO;
 
-        switch (tipoReserva.toLowerCase()) {
+        switch (tipoReserva) {
             case "infantil":
                 reservaDTO = reservaFactory.crearReservaInfantil(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroNinos);
                 break;
@@ -417,19 +432,12 @@ public class ReservasDAO {
                 reservaDTO = reservaFactory.crearReservaAdulto(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroAdultos);
                 break;
             default:
-                throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
+                throw new IllegalArgumentException("Tipo de reserva no válido.");
         }
 
-        // Aplicar el descuento calculado a la reserva
         reservaDTO.setDescuento(descuentoAntiguedad);
-
-       actualizarFechaInscripcionSiEsNecesario(jugadorDTO);
-
-        // Insertar la reserva en la base de datos
-        ReservasDAO reservasDAO = new ReservasDAO();
-        int idReserva = reservasDAO.insertarReserva(reservaDTO);
-        reservaDTO.setIdReserva(idReserva);
-        return idReserva;
+        actualizarFechaInscripcionSiEsNecesario(jugadorDTO);
+        return insertarReserva(reservaDTO);
     }
 
     /**
@@ -450,44 +458,31 @@ public class ReservasDAO {
             throw new IllegalArgumentException("La cuenta del jugador no está activa.");
         }
 
-        // Validar que la reserva sea para una fecha futura con al menos 6 horas de antelación
-        Date ahora = new Date();
-        Calendar calendario = Calendar.getInstance();
-        calendario.setTime(ahora);
-        calendario.add(Calendar.HOUR, 6);
-        Date limiteMinimoReserva = calendario.getTime();
+        // Validación de fecha y hora
+        validarFechaHora(fechaHora);
 
-        if (fechaHora.before(limiteMinimoReserva)) {
-            throw new IllegalArgumentException("La reserva debe realizarse con al menos 6 horas de antelación y no puede ser en una fecha pasada.");
-        }
-
-        // Obtener el bono asociado al jugador
+        // Obtener bono asociado o crear uno nuevo si no existe
         Bono bono = obtenerBonoPorJugador(jugadorDTO.getIdJugador());
         if (bono == null || bono.estaCaducado() || bono.getSesionesRestantes() <= 0) {
-            return false; // Bono no válido, se debe crear uno nuevo
-        }
-        
-        // Calcular el número de sesión
-        int numeroSesion = 5 - bono.getSesionesRestantes();
-        
-        // Validar las sesiones restantes del bono
-        if (bono.getSesionesRestantes() <= 0) {
-            throw new IllegalStateException("El bono no tiene sesiones restantes disponibles.");
-        }
-        
-        if(bono.estaCaducado())
-        {
-        	throw new IllegalStateException("El bono está caducado.");
+            bono = crearNuevoBono(jugadorDTO.getIdJugador());
         }
 
+        if (bono == null || bono.estaCaducado() || bono.getSesionesRestantes() <= 0) {
+            throw new IllegalStateException("No se pudo crear un bono válido.");
+        }
+
+        // Calcular número de sesión
+        int numeroSesion = 5 - bono.getSesionesRestantes();
+
+        // Validación de condiciones de la pista
         String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
         if (!cumpleCondicionesTipoReserva(pistaDTO, tipoReserva)) {
             throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
         }
 
+        // Crear reserva usando la fábrica
         ReservaFactory reservaFactory = new ReservaBonoFactory();
         ReservaDTO reservaDTO;
-
         switch (tipoReserva.toLowerCase()) {
             case "infantil":
                 reservaDTO = reservaFactory.crearReservaInfantil(jugadorDTO.getIdJugador(), fechaHora, duracionMinutos, pistaDTO.getIdPista(), numeroNinos, bono, numeroSesion);
@@ -502,16 +497,13 @@ public class ReservasDAO {
                 throw new IllegalArgumentException("Tipo de reserva no válido: " + tipoReserva);
         }
 
-        // Validar si la fecha de inscripción está en estado NULL y actualizarla si es la primera reserva
-        actualizarFechaInscripcionSiEsNecesario(jugadorDTO);
-
         // Insertar la reserva en la base de datos
         int idReserva = insertarReserva(reservaDTO);
         reservaDTO.setIdReserva(idReserva);
 
-        // Actualizar las sesiones del bono
+        // Actualizar sesiones restantes del bono
         actualizarSesionesBono(bono.getIdBono());
-        return true; // Bono válido y reserva creada con éxito
+        return true;
     }
 
 
@@ -546,27 +538,63 @@ public class ReservasDAO {
             throw new IllegalArgumentException("No se puede modificar la reserva, ya está dentro de las 24h antes de la hora de inicio.");
         }
 
-        // Determinar el tipo de reserva con los nuevos parámetros de adultos y niños
-        String tipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
+        // Validar la nueva fecha y hora
+        validarFechaHora(nuevaFechaHora);
 
-        // Verificar si la nueva pista cumple las condiciones para el tipo de reserva
-        if (!cumpleCondicionesTipoReserva(nuevaPista, tipoReserva)) {
-            throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + tipoReserva + "'.");
+        // Determinar el nuevo tipo de reserva basado en los parámetros
+        String nuevoTipoReserva = determinarTipoReserva(numeroAdultos, numeroNinos);
+
+        // Validar si la nueva pista cumple las condiciones para el tipo de reserva
+        if (!cumpleCondicionesTipoReserva(nuevaPista, nuevoTipoReserva)) {
+            throw new IllegalArgumentException("La pista seleccionada no es válida para el tipo de reserva '" + nuevoTipoReserva + "'.");
         }
 
-        // Calcular el nuevo precio y descuento de la reserva
+        // Validar el número máximo de jugadores en la nueva pista
+        validarMaximoJugadores(nuevaPista, numeroAdultos, numeroNinos);
+
+        // Calcular el nuevo precio
         float nuevoPrecio = ReservaDTO.calcularPrecio(nuevaDuracionMinutos, reservaExistente.getDescuento());
-        System.out.println("ID reserva: " + reservaExistente.getIdReserva());
-        // Actualizar la reserva en la base de datos con los parámetros específicos
-        actualizarReserva(reservaExistente.getIdReserva(), nuevaFechaHora, nuevaDuracionMinutos, nuevoPrecio, reservaExistente.getDescuento(), nuevaPista.getIdPista(), 
-                          tipoReserva.equals("familiar") || tipoReserva.equals("adulto") ? numeroAdultos : null, 
-                          tipoReserva.equals("familiar") || tipoReserva.equals("infantil") ? numeroNinos : null);
 
-        // Opcional: actualizar el número de sesión en el bono si se ha decidido consumir otra sesión
-        if (bono != null) {
-            actualizarSesionesBono(bono.getIdBono());
-        }
+        // Actualizar los datos comunes de la reserva en la tabla principal
+        actualizarReserva(reservaExistente.getIdReserva(), nuevaFechaHora, nuevaDuracionMinutos, nuevoPrecio, reservaExistente.getDescuento(), nuevaPista.getIdPista(), 
+                          nuevoTipoReserva.equals("familiar") || nuevoTipoReserva.equals("adulto") ? numeroAdultos : null, 
+                          nuevoTipoReserva.equals("familiar") || nuevoTipoReserva.equals("infantil") ? numeroNinos : null);
+
+	        switch (nuevoTipoReserva.toLowerCase()) {
+	        case "familiar":
+	            try {
+	                eliminarReservaEspecifica(reservaExistente.getIdReserva());
+	                insertarReservaFamiliar(reservaExistente.getIdReserva(), numeroAdultos, numeroNinos);
+	            } catch (SQLException e) {
+	                throw new IllegalStateException("Error al actualizar la reserva como Familiar: " + e.getMessage(), e);
+	            }
+	            break;
+	
+	        case "adulto":
+	            try {
+	                eliminarReservaEspecifica(reservaExistente.getIdReserva());
+	                insertarReservaAdulto(reservaExistente.getIdReserva(), numeroAdultos);
+	            } catch (SQLException e) {
+	                throw new IllegalStateException("Error al actualizar la reserva como Adulto: " + e.getMessage(), e);
+	            }
+	            break;
+	
+	        case "infantil":
+	            try {
+	                eliminarReservaEspecifica(reservaExistente.getIdReserva());
+	                insertarReservaInfantil(reservaExistente.getIdReserva(), numeroNinos);
+	            } catch (SQLException e) {
+	                throw new IllegalStateException("Error al actualizar la reserva como Infantil: " + e.getMessage(), e);
+	            }
+	            break;
+	
+	        default:
+	            throw new IllegalArgumentException("Tipo de reserva no válido: " + nuevoTipoReserva);
+	    }
+
     }
+
+
 
 
 
@@ -679,18 +707,15 @@ public class ReservasDAO {
                             }
                         }
                     }
-
-                    if (reservaDTO == null) {
-                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
-                        continue;
-                    }
-
+                    if(reservaDTO != null)
+                    {
                     // Asignar precio y descuento a la reserva
                     reservaDTO.setIdReserva(idReserva);
                     reservaDTO.setPrecio(precio);
                     reservaDTO.setDescuento(descuento);
 
                     reservasFuturas.add(reservaDTO);
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -807,12 +832,8 @@ public class ReservasDAO {
                         }
                     }
 
-                    // Verificar si la reserva fue creada, si no, continuar con la siguiente
-                    if (reservaDTO == null) {
-                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
-                        continue;
-                    }
-
+                    if(reservaDTO != null)
+                    {
                     // Asignar precio y descuento a la reserva
                     reservaDTO.setIdReserva(idReserva);
                     reservaDTO.setPrecio(precio);
@@ -820,6 +841,7 @@ public class ReservasDAO {
 
                     // Agregar la reserva a la lista de resultados
                     reservasPorFecha.add(reservaDTO);
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -914,12 +936,6 @@ public class ReservasDAO {
                         }
                     }
 
-                    // Si no se encontró ningún tipo de reserva específico, lanzar error
-                    if (reservaDTO == null) {
-                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
-                        return null;
-                    }
-
                     // Asignar precio y descuento a la reserva
                     reservaDTO.setIdReserva(idReserva);
                     reservaDTO.setPrecio(precio);
@@ -938,7 +954,6 @@ public class ReservasDAO {
             }
         }
 
-        System.out.println("Error: reserva no encontrada en la base de datos.");
         return null;
     }
 
@@ -1023,7 +1038,6 @@ public class ReservasDAO {
                     }
 
                     if (reservaDTO == null) {
-                        System.out.println("Error: tipo de reserva específica no encontrada para el idReserva " + idReserva);
                         return null;
                     }
 
@@ -1071,13 +1085,13 @@ public class ReservasDAO {
 
     /**
      * Determina el tipo de reserva según el número de adultos y niños.
-     *
+     * 
      * @param numeroAdultos El número de adultos.
      * @param numeroNinos El número de niños.
-     * @return El tipo de reserva (infantil, familiar o adulto).
-     * @throws IllegalArgumentException Si no se proporciona un número válido de adultos o niños.
+     * @return El tipo de reserva.
+     * @throws IllegalArgumentException Si no se puede determinar el tipo de reserva.
      */
-    private String determinarTipoReserva(int numeroAdultos, int numeroNinos) {
+    public String determinarTipoReserva(int numeroAdultos, int numeroNinos) {
         if (numeroAdultos > 0 && numeroNinos > 0) {
             return "familiar";
         } else if (numeroAdultos > 0) {
@@ -1085,9 +1099,58 @@ public class ReservasDAO {
         } else if (numeroNinos > 0) {
             return "infantil";
         } else {
-            throw new IllegalArgumentException("No se ha proporcionado un número válido de adultos o niños.");
+            throw new IllegalArgumentException("El número de adultos y niños no puede ser ambos cero.");
         }
     }
+    
+    /**
+     * Valida que la fecha y hora de la reserva sea válida.
+     * 
+     * @param fechaHora La fecha y hora de la reserva.
+     * @throws IllegalArgumentException Si la fecha y hora no es válida.
+     */
+    private void validarFechaHora(Date fechaHora) {
+        Date ahora = new Date();
+
+        // Validar que la reserva sea futura con al menos 6 horas de antelación
+        Calendar calendario = Calendar.getInstance();
+        calendario.setTime(ahora);
+        calendario.add(Calendar.HOUR, 6);
+        Date limiteMinimoReserva = calendario.getTime();
+
+        if (fechaHora.before(limiteMinimoReserva)) {
+            throw new IllegalArgumentException("La reserva debe realizarse con al menos 6 horas de antelación.");
+        }
+
+        // Validar horario permitido (9:00 a 20:30)
+        Calendar horaReserva = Calendar.getInstance();
+        horaReserva.setTime(fechaHora);
+        int hora = horaReserva.get(Calendar.HOUR_OF_DAY);
+        int minuto = horaReserva.get(Calendar.MINUTE);
+
+        if (hora < 9 || (hora == 20 && minuto > 30) || hora > 20) {
+            throw new IllegalArgumentException("La reserva solo puede realizarse entre las 9:00 y las 20:30.");
+        }
+    }
+    
+    /**
+     * Valida que el número de jugadores no exceda el máximo permitido para la pista.
+     * 
+     * @param pistaDTO La pista a reservar.
+     * @param numeroAdultos El número de adultos en la reserva.
+     * @param numeroNinos El número de niños en la reserva.
+     * @throws IllegalArgumentException Si el número de jugadores excede el máximo permitido.
+     */
+    private void validarMaximoJugadores(PistaDTO pistaDTO, int numeroAdultos, int numeroNinos) {
+        int maxJugadores = pistaDTO.getMax_jugadores();
+        int totalJugadores = numeroAdultos + numeroNinos;
+
+        if (totalJugadores > maxJugadores) {
+            throw new IllegalArgumentException("El número total de jugadores excede el máximo permitido para la pista.");
+        }
+    }
+
+
 
     /**
      * Busca un jugador por su correo electrónico.
@@ -1221,39 +1284,100 @@ public class ReservasDAO {
         return reservaDTO;
     }
 
-    public ReservaDTO obtenerReservaPorIdBono(int idReserva, Bono bono) throws SQLException {
+    public ReservaDTO obtenerReservaPorIdBono(int idUsuario, Bono bono) {
         ReservaDTO reservaDTO = null;
-        String sqlBaseReserva = prop.getProperty("buscarReservaPorIdBono"); // Define esta consulta en `sql.properties`
+        String sqlBaseReserva = prop.getProperty("encontrarReservaPorIdBono");
+        if (sqlBaseReserva == null) {
+            throw new IllegalStateException("La consulta 'encontrarReservaPorIdBono' no está definida.");
+        }
 
         DBConnection conexion = new DBConnection();
         Connection con = (Connection) conexion.getConnection();
 
-        if (con == null) {
-            throw new SQLException("Error: No se pudo establecer la conexión a la base de datos.");
-        }
-
         try (PreparedStatement ps = con.prepareStatement(sqlBaseReserva)) {
-            ps.setInt(1, idReserva);
+            ps.setInt(1, idUsuario);
             ps.setInt(2, bono.getIdBono());
+
             try (ResultSet rs = (ResultSet) ps.executeQuery()) {
                 if (rs.next()) {
-                    // Obtener datos comunes de la reserva
-                    int idJugador = rs.getInt("idJugador");
+                    // Datos comunes de la reserva
+                    int idReserva = rs.getInt("idReserva");
                     int idPista = rs.getInt("idPista");
                     Date fechaHora = rs.getTimestamp("fechaHora");
+                    int duracionMin = rs.getInt("duracionMin");
+                    float precio = rs.getFloat("precio");
+                    float descuento = rs.getFloat("descuento");
 
-                    // Usar el método `encontrarReserva` para obtener la reserva completa
-                    reservaDTO = encontrarReserva(idJugador, idPista, fechaHora);
+                    // Crear la instancia de la fábrica adecuada
+                    ReservaFactory reservaFactory = new ReservaBonoFactory();
+
+                    // Usar numeroSesion del objeto Bono
+                    int numeroSesion = 5 - bono.getSesionesRestantes();
+
+                    // Intentar identificar la reserva como familiar
+                    String sqlFamiliar = prop.getProperty("buscarReservaFamiliar");
+                    try (PreparedStatement psFamiliar = con.prepareStatement(sqlFamiliar)) {
+                        psFamiliar.setInt(1, idReserva);
+                        try (ResultSet rsFamiliar = (ResultSet) psFamiliar.executeQuery()) {
+                            if (rsFamiliar.next()) {
+                                int numeroAdultos = rsFamiliar.getInt("numAdultos");
+                                int numeroNinos = rsFamiliar.getInt("numNinos");
+                                reservaDTO = reservaFactory.crearReservaFamiliar(idUsuario, fechaHora, duracionMin, idPista, numeroAdultos, numeroNinos, bono, numeroSesion);
+                            }
+                        }
+                    }
+
+                    // Si no es familiar, intentar identificar como adulto
+                    if (reservaDTO == null) {
+                        String sqlAdulto = prop.getProperty("buscarReservaAdulto");
+                        try (PreparedStatement psAdulto = con.prepareStatement(sqlAdulto)) {
+                            psAdulto.setInt(1, idReserva);
+                            try (ResultSet rsAdulto = (ResultSet) psAdulto.executeQuery()) {
+                                if (rsAdulto.next()) {
+                                    int numeroAdultos = rsAdulto.getInt("numAdultos");
+                                    reservaDTO = reservaFactory.crearReservaAdulto(idUsuario, fechaHora, duracionMin, idPista, numeroAdultos, bono, numeroSesion);
+                                }
+                            }
+                        }
+                    }
+
+                    // Si no es ni familiar ni adulto, intentar identificar como infantil
+                    if (reservaDTO == null) {
+                        String sqlInfantil = prop.getProperty("buscarReservaInfantil");
+                        try (PreparedStatement psInfantil = con.prepareStatement(sqlInfantil)) {
+                            psInfantil.setInt(1, idReserva);
+                            try (ResultSet rsInfantil = (ResultSet) psInfantil.executeQuery()) {
+                                if (rsInfantil.next()) {
+                                    int numeroNinos = rsInfantil.getInt("numNinos");
+                                    reservaDTO = reservaFactory.crearReservaInfantil(idUsuario, fechaHora, duracionMin, idPista, numeroNinos, bono, numeroSesion);
+                                }
+                            }
+                        }
+                    }
+
+                    if (reservaDTO == null) {
+                        return null;
+                    }
+
+                    // Asignar precio y descuento a la reserva
+                    reservaDTO.setIdReserva(idReserva);
+                    reservaDTO.setPrecio(precio);
+                    reservaDTO.setDescuento(descuento);
                 }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         } finally {
-            if (con != null) {
-                con.close();
+            try {
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
             }
         }
 
         return reservaDTO;
     }
+
 
 
 }
