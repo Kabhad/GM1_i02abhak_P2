@@ -150,50 +150,66 @@ public class PistasDAO {
     /**
      * Método para asociar un material a una pista disponible.
      * 
-     * @param nombrePista Nombre de la pista a la que se quiere asociar el material.
-     * @param idMaterial  ID del material a asociar.
-     * @return True si la asociación fue exitosa, false en caso contrario.
-     * @throws SQLException Si ocurre un error al interactuar con la base de datos.
-     * @throws ElementoNoEncontradoException Si la pista o el material no existen.
-     * @throws AsociacionMaterialException Si la pista o el material no están disponibles o hay un problema en la asociación.
+     *  @param nombrePista El nombre de la pista a la que se quiere asociar el material.
+ * 	 *  @param idMaterial  El ID del material a asociar.
+ * 	 *  @return {@code true} si la asociación se realizó con éxito; {@code false} en caso contrario.
+ *   *  @throws SQLException Si ocurre un error al interactuar con la base de datos.
+ *   *  @throws ElementoNoEncontradoException Si la pista o el material no se encuentran en la base de datos.
+ *   *  @throws AsociacionMaterialException Si la pista no está disponible, el material no está en buen estado, 
+ *   *          el material ya está reservado, o si no se cumplen las condiciones para la asociación.
      */
     public boolean asociarMaterialAPista(String nombrePista, int idMaterial) throws SQLException, ElementoNoEncontradoException, AsociacionMaterialException {
         DBConnection conexion = new DBConnection();
         con = (Connection) conexion.getConnection();
+        
+        // Consulta para buscar la pista por nombre
         String buscarPistaPorNombre = prop.getProperty("buscarPistaPorNombre");
+        // Consulta para obtener el estado del material
         String obtenerEstadoMaterial = "SELECT idMaterial, tipo, usoExterior, estado FROM Material WHERE idMaterial = ?";
+        // Consulta para asociar el material a la pista
         String asociarMaterialAPista = prop.getProperty("asociarMaterialAPista");
+        // Consulta para actualizar el estado del material
         String actualizarEstadoMaterial = "UPDATE Material SET estado = 'RESERVADO' WHERE idMaterial = ?";
 
-        try (PreparedStatement psEstado = con.prepareStatement(obtenerEstadoMaterial)) {
-            psEstado.setInt(1, idMaterial);
-            ResultSet rsEstado = psEstado.executeQuery();
-            if (!rsEstado.next()) {
-                throw new ElementoNoEncontradoException("No se encontró el material con el ID especificado.");
+        // Buscar la pista por nombre primero y verificar disponibilidad
+        try (PreparedStatement psBuscar = con.prepareStatement(buscarPistaPorNombre)) {
+            psBuscar.setString(1, nombrePista);
+            ResultSet rs = psBuscar.executeQuery();
+            if (!rs.next()) {
+                throw new ElementoNoEncontradoException("No se encontró la pista con el nombre especificado.");
             }
-            TipoMaterial tipoMaterial = TipoMaterial.valueOf(rsEstado.getString("tipo"));
-            boolean usoExteriorMaterial = rsEstado.getBoolean("usoExterior");
-            String estadoMaterial = rsEstado.getString("estado");
 
-            if ("MAL_ESTADO".equals(estadoMaterial) || "RESERVADO".equals(estadoMaterial)) {
-                throw new AsociacionMaterialException("El material no se puede asociar porque está en MAL_ESTADO o ya está RESERVADO.");
+            int idPista = rs.getInt("idPista");
+            boolean esExterior = rs.getBoolean("exterior");
+            boolean disponible = rs.getBoolean("disponible");
+
+            // Validación de disponibilidad de la pista
+            if (!disponible) {
+                throw new AsociacionMaterialException("La pista no está disponible para la asociación de materiales.");
             }
-            rsEstado.close();
+            rs.close();
 
-            try (PreparedStatement psBuscar = con.prepareStatement(buscarPistaPorNombre)) {
-                psBuscar.setString(1, nombrePista);
-                ResultSet rs = psBuscar.executeQuery();
-                if (!rs.next()) {
-                    throw new ElementoNoEncontradoException("No se encontró la pista con el nombre especificado.");
+            // Ahora, verificar el estado del material
+            try (PreparedStatement psEstado = con.prepareStatement(obtenerEstadoMaterial)) {
+                psEstado.setInt(1, idMaterial);
+                ResultSet rsEstado = psEstado.executeQuery();
+                if (!rsEstado.next()) {
+                    throw new ElementoNoEncontradoException("No se encontró el material con el ID especificado.");
                 }
+                TipoMaterial tipoMaterial = TipoMaterial.valueOf(rsEstado.getString("tipo"));
+                boolean usoExteriorMaterial = rsEstado.getBoolean("usoExterior");
+                String estadoMaterial = rsEstado.getString("estado");
 
-                int idPista = rs.getInt("idPista");
-                boolean esExterior = rs.getBoolean("exterior");
+                if ("MAL_ESTADO".equals(estadoMaterial) || "RESERVADO".equals(estadoMaterial)) {
+                    throw new AsociacionMaterialException("El material no se puede asociar porque está en MAL_ESTADO o ya está RESERVADO.");
+                }
+                rsEstado.close();
 
                 if (esExterior && !usoExteriorMaterial) {
                     throw new AsociacionMaterialException("El material no se puede usar en una pista exterior porque no es apto para exteriores.");
                 }
 
+                // Verificar el número de materiales ya asociados a la pista
                 String verificarMateriales = "SELECT tipo, COUNT(*) AS cantidad FROM Material WHERE idPista = ? GROUP BY tipo";
                 try (PreparedStatement psVerificar = con.prepareStatement(verificarMateriales)) {
                     psVerificar.setInt(1, idPista);
@@ -226,6 +242,7 @@ public class PistasDAO {
                     }
                 }
 
+                // Asociar el material a la pista
                 try (PreparedStatement psAsociar = con.prepareStatement(asociarMaterialAPista)) {
                     psAsociar.setInt(1, idPista);
                     psAsociar.setInt(2, idMaterial);
@@ -244,6 +261,7 @@ public class PistasDAO {
             }
         }
     }
+
 
     /**
      * Método auxiliar para buscar una pista por su nombre.
