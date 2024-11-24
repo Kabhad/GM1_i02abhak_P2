@@ -9,7 +9,7 @@ Comando para Ejecutar el Programa
 
 bash
 
-java -jar GM1_i02abhak_P2.jar
+java -jar GM1_i02abhak.jar
 
 El comando anterior ejecuta el programa en la terminal y abre el sistema de gestión.
 Navegación del Sistema
